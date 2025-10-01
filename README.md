@@ -18,7 +18,6 @@ A modern, beautiful desktop GUI application for managing Arch Linux packages bui
 - **Transaction History**: View recent package operations from pacman logs
 - **Package Details**: Click any package name to view detailed information
 - **Cache Management**: Clean package cache with one click
-- **Export Package List**: Export installed packages to a text file
 
 ### Settings & Configuration
 - **Persistent Configuration**: All settings saved automatically
@@ -28,7 +27,6 @@ A modern, beautiful desktop GUI application for managing Arch Linux packages bui
 - **Compact View**: Toggle between normal and compact display modes
 - **Show/Hide Descriptions**: Control package description visibility
 - **AUR Support** (Experimental): Toggle AUR helper integration (yay/paru)
-- **Export/Import Settings**: Backup and restore your configuration
 - **Max Concurrent Downloads**: Configure download parallelism
 
 ### UI/UX Features
@@ -70,7 +68,7 @@ A modern, beautiful desktop GUI application for managing Arch Linux packages bui
 **Component Structure:**
 - `App.vue` - Main application component with state management
 - `Sidebar.vue` - Navigation menu with settings access
-- `SearchBar.vue` - Search and quick actions (search, update, export)
+- `SearchBar.vue` - Search and system update actions
 - `PackageTable.vue` - Package listing with actions and details
 - `StatusBar.vue` - Selection status and batch actions
 - `LogModal.vue` - Live log viewer with auto-scroll
@@ -170,9 +168,8 @@ The app uses `pkexec` for privilege escalation when installing/removing packages
 5. **Batch Operations**: Select multiple packages and use bottom bar actions
 6. **System Update**: Click "Update System" button in top bar
 7. **View Details**: Click on any package name to see detailed information
-8. **Export List**: Click "Export" to download your installed package list
-9. **Settings**: Access comprehensive settings from sidebar
-10. **Clean Cache**: Remove old package files from settings panel
+8. **Settings**: Access comprehensive settings from sidebar
+9. **Clean Cache**: Remove old package files from settings panel
 
 ### Settings Panel
 
@@ -183,7 +180,7 @@ Access settings by clicking the gear icon in the sidebar:
 - **Auto-Refresh**: Configure automatic package list updates
 - **AUR Support**: Enable experimental AUR helper integration
 - **Cache Management**: View and clean package cache
-- **Advanced**: Configure downloads, export/import settings
+- **Advanced**: Configure max concurrent downloads
 - **Reset**: Restore all settings to defaults
 
 ## Design Decisions

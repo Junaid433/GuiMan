@@ -55,21 +55,6 @@ export class ConfigManager {
     this.config = { ...DEFAULT_CONFIG }
     localStorage.removeItem('guiman_config')
   }
-
-  export() {
-    return JSON.stringify(this.config, null, 2)
-  }
-
-  import(jsonString) {
-    try {
-      const imported = JSON.parse(jsonString)
-      this.save(imported)
-      return true
-    } catch (e) {
-      console.error('Failed to import config:', e)
-      return false
-    }
-  }
 }
 
 export default new ConfigManager()

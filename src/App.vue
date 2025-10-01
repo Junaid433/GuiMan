@@ -14,7 +14,6 @@
           v-model="searchQuery" 
           @search="handleSearch"
           @update-system="handleUpdateSystem"
-          @export-list="exportPackageList"
         />
         
         <div class="flex-1 overflow-hidden">
@@ -225,21 +224,6 @@ export default {
       }
     }
 
-    const exportPackageList = async () => {
-      try {
-        const list = await invoke('export_package_list')
-        const dataStr = list.join('\n')
-        const dataBlob = new Blob([dataStr], { type: 'text/plain' })
-        const url = URL.createObjectURL(dataBlob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = 'installed-packages.txt'
-        link.click()
-        URL.revokeObjectURL(url)
-      } catch (error) {
-        console.error('Failed to export package list:', error)
-      }
-    }
 
     const handleViewChange = async (view) => {
       activeView.value = view
@@ -442,7 +426,6 @@ export default {
       handleUpdateSystem,
       handleCleanCache,
       showPackageDetails,
-      exportPackageList,
       closeLogModal
     }
   }

@@ -179,15 +179,6 @@
             <input type="number" v-model.number="localConfig.maxConcurrentDownloads" min="1" max="10" class="mt-1 w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white">
           </div>
 
-          <div class="flex gap-3">
-            <button @click="exportConfig" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
-              Export Config
-            </button>
-            <button @click="importConfig" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors">
-              Import Config
-            </button>
-          </div>
-
           <button @click="resetConfig" class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
             Reset to Defaults
           </button>
@@ -250,36 +241,6 @@ export default {
         this.$emit('save', null)
         this.$emit('close')
       }
-    },
-    exportConfig() {
-      const dataStr = JSON.stringify(this.localConfig, null, 2)
-      const dataBlob = new Blob([dataStr], { type: 'application/json' })
-      const url = URL.createObjectURL(dataBlob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = 'guiman-config.json'
-      link.click()
-      URL.revokeObjectURL(url)
-    },
-    importConfig() {
-      const input = document.createElement('input')
-      input.type = 'file'
-      input.accept = 'application/json'
-      input.onchange = (e) => {
-        const file = e.target.files[0]
-        const reader = new FileReader()
-        reader.onload = (event) => {
-          try {
-            const imported = JSON.parse(event.target.result)
-            this.localConfig = imported
-            alert('Config imported successfully!')
-          } catch (error) {
-            alert('Failed to import config: Invalid JSON')
-          }
-        }
-        reader.readAsText(file)
-      }
-      input.click()
     }
   }
 }
