@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::process::{Command, Stdio};
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use tauri::Window;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -88,26 +88,10 @@ async fn list_installed() -> Result<Vec<PackageInfo>, String> {
     for line in stdout.lines() {
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() >= 2 {
-            let output_info = Command::new("pacman")
-                .args(&["-Qi", parts[0]])
-                .output()
-                .ok();
-
-            let repo = if let Some(info) = output_info {
-                let info_str = String::from_utf8_lossy(&info.stdout);
-                info_str.lines()
-                    .find(|l| l.starts_with("Repository"))
-                    .and_then(|l| l.split(':').nth(1))
-                    .map(|r| r.trim().to_string())
-                    .unwrap_or_else(|| "local".to_string())
-            } else {
-                "local".to_string()
-            };
-
             packages.push(PackageInfo {
                 name: parts[0].to_string(),
                 version: parts[1].to_string(),
-                repo,
+                repo: "local".to_string(),
                 description: String::new(),
                 installed: true,
             });
@@ -128,13 +112,49 @@ async fn install_package(window: Window, pkg: String) -> Result<CommandResult, S
             .spawn()
             .expect("Failed to start install process");
 
+        let window_clone = window.clone();
         if let Some(stdout) = child.stdout.take() {
-            let reader = BufReader::new(stdout);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    let _ = window.emit("install-log", line);
+            tokio::spawn(async move {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let _ = window_clone.emit("install-log", line);
+                    }
                 }
-            }
+            });
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let window_clone = window.clone();
+            tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut buffer = Vec::new();
+                let mut temp = [0u8; 1024];
+                
+                loop {
+                    match reader.read(&mut temp) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            for &byte in &temp[..n] {
+                                if byte == b'\n' || byte == b'\r' {
+                                    if !buffer.is_empty() {
+                                        if let Ok(line) = String::from_utf8(buffer.clone()) {
+                                            let trimmed = line.trim();
+                                            if !trimmed.is_empty() {
+                                                let _ = window_clone.emit("install-log", trimmed.to_string());
+                                            }
+                                        }
+                                        buffer.clear();
+                                    }
+                                } else {
+                                    buffer.push(byte);
+                                }
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
         }
 
         let status = child.wait().expect("Failed to wait for child");
@@ -159,13 +179,49 @@ async fn remove_package(window: Window, pkg: String) -> Result<CommandResult, St
             .spawn()
             .expect("Failed to start remove process");
 
+        let window_clone = window.clone();
         if let Some(stdout) = child.stdout.take() {
-            let reader = BufReader::new(stdout);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    let _ = window.emit("remove-log", line);
+            tokio::spawn(async move {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let _ = window_clone.emit("remove-log", line);
+                    }
                 }
-            }
+            });
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let window_clone = window.clone();
+            tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut buffer = Vec::new();
+                let mut temp = [0u8; 1024];
+                
+                loop {
+                    match reader.read(&mut temp) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            for &byte in &temp[..n] {
+                                if byte == b'\n' || byte == b'\r' {
+                                    if !buffer.is_empty() {
+                                        if let Ok(line) = String::from_utf8(buffer.clone()) {
+                                            let trimmed = line.trim();
+                                            if !trimmed.is_empty() {
+                                                let _ = window_clone.emit("remove-log", trimmed.to_string());
+                                            }
+                                        }
+                                        buffer.clear();
+                                    }
+                                } else {
+                                    buffer.push(byte);
+                                }
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
         }
 
         let status = child.wait().expect("Failed to wait for child");
@@ -189,13 +245,49 @@ async fn update_system(window: Window) -> Result<CommandResult, String> {
             .spawn()
             .expect("Failed to start update process");
 
+        let window_clone = window.clone();
         if let Some(stdout) = child.stdout.take() {
-            let reader = BufReader::new(stdout);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    let _ = window.emit("update-log", line);
+            tokio::spawn(async move {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let _ = window_clone.emit("update-log", line);
+                    }
                 }
-            }
+            });
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let window_clone = window.clone();
+            tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut buffer = Vec::new();
+                let mut temp = [0u8; 1024];
+                
+                loop {
+                    match reader.read(&mut temp) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            for &byte in &temp[..n] {
+                                if byte == b'\n' || byte == b'\r' {
+                                    if !buffer.is_empty() {
+                                        if let Ok(line) = String::from_utf8(buffer.clone()) {
+                                            let trimmed = line.trim();
+                                            if !trimmed.is_empty() {
+                                                let _ = window_clone.emit("update-log", trimmed.to_string());
+                                            }
+                                        }
+                                        buffer.clear();
+                                    }
+                                } else {
+                                    buffer.push(byte);
+                                }
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
         }
 
         let status = child.wait().expect("Failed to wait for child");
@@ -266,13 +358,49 @@ async fn clean_cache(window: Window) -> Result<CommandResult, String> {
             .spawn()
             .expect("Failed to start cache clean process");
 
+        let window_clone = window.clone();
         if let Some(stdout) = child.stdout.take() {
-            let reader = BufReader::new(stdout);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    let _ = window.emit("cache-clean-log", line);
+            tokio::spawn(async move {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let _ = window_clone.emit("cache-clean-log", line);
+                    }
                 }
-            }
+            });
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let window_clone = window.clone();
+            tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut buffer = Vec::new();
+                let mut temp = [0u8; 1024];
+                
+                loop {
+                    match reader.read(&mut temp) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            for &byte in &temp[..n] {
+                                if byte == b'\n' || byte == b'\r' {
+                                    if !buffer.is_empty() {
+                                        if let Ok(line) = String::from_utf8(buffer.clone()) {
+                                            let trimmed = line.trim();
+                                            if !trimmed.is_empty() {
+                                                let _ = window_clone.emit("cache-clean-log", trimmed.to_string());
+                                            }
+                                        }
+                                        buffer.clear();
+                                    }
+                                } else {
+                                    buffer.push(byte);
+                                }
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
         }
 
         let status = child.wait().expect("Failed to wait for child");

@@ -41,6 +41,8 @@
         v-if="showLogModal"
         :logs="logs"
         :operation="currentOperation"
+        :completed="operationCompleted"
+        :success="operationSuccess"
         @close="closeLogModal"
       />
 
@@ -110,6 +112,8 @@ export default {
     const showLogModal = ref(false)
     const logs = ref([])
     const currentOperation = ref('')
+    const operationCompleted = ref(false)
+    const operationSuccess = ref(false)
     const config = ref(configManager.config)
     const darkMode = ref(config.value.theme === 'dark')
     const showSettingsModal = ref(false)
@@ -216,12 +220,16 @@ export default {
       showSettingsModal.value = false
       currentOperation.value = 'Cleaning package cache'
       logs.value = []
+      operationCompleted.value = false
+      operationSuccess.value = false
       showLogModal.value = true
 
       try {
         await invoke('clean_cache')
       } catch (error) {
         logs.value.push(`Error: ${error}`)
+        operationCompleted.value = true
+        operationSuccess.value = false
       }
     }
 
@@ -262,6 +270,11 @@ export default {
               installed: false
             }))
             break
+          case 'search':
+            if (searchQuery.value.trim()) {
+              packages.value = await invoke('search_package', { query: searchQuery.value })
+            }
+            break
         }
       } catch (error) {
         console.error('Error loading packages:', error)
@@ -296,50 +309,120 @@ export default {
     const handleInstall = async (pkg) => {
       currentOperation.value = `Installing ${pkg.name}`
       logs.value = []
+      operationCompleted.value = false
+      operationSuccess.value = false
       showLogModal.value = true
 
       try {
         await invoke('install_package', { pkg: pkg.name })
       } catch (error) {
         logs.value.push(`Error: ${error}`)
+        operationCompleted.value = true
+        operationSuccess.value = false
       }
     }
 
     const handleRemove = async (pkg) => {
       currentOperation.value = `Removing ${pkg.name}`
       logs.value = []
+      operationCompleted.value = false
+      operationSuccess.value = false
       showLogModal.value = true
 
       try {
         await invoke('remove_package', { pkg: pkg.name })
       } catch (error) {
         logs.value.push(`Error: ${error}`)
+        operationCompleted.value = true
+        operationSuccess.value = false
       }
     }
 
     const handleInstallSelected = async () => {
-      for (const pkg of selectedPackages.value) {
-        await handleInstall(pkg)
+      if (selectedPackages.value.length === 0) return
+
+      const doInstall = async () => {
+        const packageNames = selectedPackages.value.map(p => p.name).join(' ')
+        currentOperation.value = `Installing ${selectedPackages.value.length} packages`
+        logs.value = []
+        operationCompleted.value = false
+        operationSuccess.value = false
+        showLogModal.value = true
+
+        try {
+          await invoke('install_package', { pkg: packageNames })
+        } catch (error) {
+          logs.value.push(`Error: ${error}`)
+          operationCompleted.value = true
+          operationSuccess.value = false
+        }
+        
+        selectedPackages.value = []
       }
-      selectedPackages.value = []
+
+      if (config.value.confirmActions) {
+        const packageList = selectedPackages.value.map(p => p.name).join(', ')
+        showConfirm(
+          'Install Multiple Packages',
+          `Install ${selectedPackages.value.length} packages:\n${packageList}`,
+          doInstall,
+          'warning',
+          'Install All'
+        )
+      } else {
+        await doInstall()
+      }
     }
 
     const handleRemoveSelected = async () => {
-      for (const pkg of selectedPackages.value) {
-        await handleRemove(pkg)
+      if (selectedPackages.value.length === 0) return
+
+      const doRemove = async () => {
+        const packageNames = selectedPackages.value.map(p => p.name).join(' ')
+        currentOperation.value = `Removing ${selectedPackages.value.length} packages`
+        logs.value = []
+        operationCompleted.value = false
+        operationSuccess.value = false
+        showLogModal.value = true
+
+        try {
+          await invoke('remove_package', { pkg: packageNames })
+        } catch (error) {
+          logs.value.push(`Error: ${error}`)
+          operationCompleted.value = true
+          operationSuccess.value = false
+        }
+        
+        selectedPackages.value = []
       }
-      selectedPackages.value = []
+
+      if (config.value.confirmActions) {
+        const packageList = selectedPackages.value.map(p => p.name).join(', ')
+        showConfirm(
+          'Remove Multiple Packages',
+          `Remove ${selectedPackages.value.length} packages:\n${packageList}`,
+          doRemove,
+          'danger',
+          'Remove All'
+        )
+      } else {
+        await doRemove()
+      }
     }
 
     const handleUpdateSystem = async () => {
       currentOperation.value = 'Updating system'
       logs.value = []
+      operationCompleted.value = false
+      operationSuccess.value = false
       showLogModal.value = true
 
       try {
         await invoke('update_system')
       } catch (error) {
         logs.value.push(`Error: ${error}`)
+        operationCompleted.value = true
+        operationSuccess.value = false
       }
     }
 
@@ -414,18 +497,26 @@ export default {
       })
 
       listen('install-complete', (event) => {
+        operationCompleted.value = true
+        operationSuccess.value = event.payload
         logs.value.push(event.payload ? '✓ Installation complete!' : '✗ Installation failed!')
       })
 
       listen('remove-complete', (event) => {
+        operationCompleted.value = true
+        operationSuccess.value = event.payload
         logs.value.push(event.payload ? '✓ Removal complete!' : '✗ Removal failed!')
       })
 
       listen('update-complete', (event) => {
+        operationCompleted.value = true
+        operationSuccess.value = event.payload
         logs.value.push(event.payload ? '✓ Update complete!' : '✗ Update failed!')
       })
 
       listen('cache-clean-complete', (event) => {
+        operationCompleted.value = true
+        operationSuccess.value = event.payload
         logs.value.push(event.payload ? '✓ Cache cleaned!' : '✗ Cache cleaning failed!')
       })
     })
@@ -446,6 +537,8 @@ export default {
       showLogModal,
       logs,
       currentOperation,
+      operationCompleted,
+      operationSuccess,
       darkMode,
       config,
       showSettingsModal,
