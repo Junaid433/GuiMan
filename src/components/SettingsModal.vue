@@ -17,6 +17,40 @@
 
       <div class="flex-1 overflow-auto p-6 scrollbar-thin space-y-6">
         <div class="space-y-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">System Integration</h3>
+          
+          <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+              <svg class="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+              </svg>
+              <div class="flex-1">
+                <h4 class="font-semibold text-gray-900 dark:text-white">Password-Free Package Management</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                  Install the polkit policy to stop password prompts for every operation. You'll only authenticate once when you open GuiMan.
+                </p>
+                <div class="mt-3 flex items-center gap-3">
+                  <div v-if="polkitInstalled" class="flex items-center gap-2 text-green-600 dark:text-green-400">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-sm font-medium">Installed</span>
+                  </div>
+                  <button 
+                    v-else
+                    @click="installPolkit"
+                    :disabled="installingPolkit"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm rounded-lg font-medium transition-colors"
+                  >
+                    {{ installingPolkit ? 'Installing...' : 'Install Now' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">General</h3>
           
           <div class="flex items-center justify-between">
@@ -173,6 +207,8 @@
 </template>
 
 <script>
+import { invoke } from '@tauri-apps/api/tauri'
+
 export default {
   name: 'SettingsModal',
   props: {
@@ -181,10 +217,31 @@ export default {
   emits: ['close', 'save', 'clean-cache'],
   data() {
     return {
-      localConfig: { ...this.config }
+      localConfig: { ...this.config },
+      polkitInstalled: false,
+      installingPolkit: false
+    }
+  },
+  async mounted() {
+    try {
+      this.polkitInstalled = await invoke('check_polkit_policy')
+    } catch (error) {
+      console.error('Failed to check polkit policy:', error)
     }
   },
   methods: {
+    async installPolkit() {
+      this.installingPolkit = true
+      try {
+        const result = await invoke('install_polkit_policy')
+        this.polkitInstalled = true
+        alert('✓ ' + result.message + '\n\nRestart GuiMan for changes to take effect.')
+      } catch (error) {
+        alert('✗ Failed to install polkit policy:\n' + error)
+      } finally {
+        this.installingPolkit = false
+      }
+    },
     saveSettings() {
       this.$emit('save', this.localConfig)
     },

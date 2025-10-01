@@ -331,6 +331,57 @@ async fn get_cache_size() -> Result<String, String> {
     Ok(size)
 }
 
+#[tauri::command]
+async fn install_polkit_policy() -> Result<CommandResult, String> {
+    let policy_content = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+
+  <action id="com.guiman.pacman">
+    <description>Run pacman package manager</description>
+    <message>Authentication is required to manage packages</message>
+    <icon_name>package-x-generic</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/pacman</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+</policyconfig>
+"#;
+
+    let temp_file = "/tmp/com.guiman.pkexec.policy";
+    std::fs::write(temp_file, policy_content)
+        .map_err(|e| format!("Failed to write policy file: {}", e))?;
+
+    let output = Command::new("pkexec")
+        .args(&["cp", temp_file, "/usr/share/polkit-1/actions/com.guiman.pkexec.policy"])
+        .output()
+        .map_err(|e| format!("Failed to install policy: {}", e))?;
+
+    std::fs::remove_file(temp_file).ok();
+
+    if output.status.success() {
+        Ok(CommandResult {
+            success: true,
+            message: "Polkit policy installed successfully! Password prompts disabled.".to_string(),
+            data: None,
+        })
+    } else {
+        Err("Failed to install polkit policy. Make sure you entered the correct password.".to_string())
+    }
+}
+
+#[tauri::command]
+async fn check_polkit_policy() -> Result<bool, String> {
+    Ok(std::path::Path::new("/usr/share/polkit-1/actions/com.guiman.pkexec.policy").exists())
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -345,7 +396,9 @@ fn main() {
             clean_cache,
             get_package_info,
             export_package_list,
-            get_cache_size
+            get_cache_size,
+            install_polkit_policy,
+            check_polkit_policy
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
