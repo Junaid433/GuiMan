@@ -21,6 +21,7 @@ A modern, beautiful desktop GUI application for managing Arch Linux packages bui
 
 ### Settings & Configuration
 - **Persistent Configuration**: All settings saved automatically
+- **Window State Memory**: Remembers window size and position between sessions
 - **Confirmation Dialogs**: Optional confirmation before install/remove
 - **Auto-Refresh**: Automatically refresh package list at configurable intervals
 - **Check Updates on Startup**: Option to check for updates when app starts

@@ -78,6 +78,7 @@
 import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
+import { appWindow } from '@tauri-apps/api/window'
 import Sidebar from './components/Sidebar.vue'
 import SearchBar from './components/SearchBar.vue'
 import PackageTable from './components/PackageTable.vue'
@@ -347,7 +348,38 @@ export default {
       handleViewChange(activeView.value)
     }
 
+    const restoreWindowState = async () => {
+      try {
+        const savedState = localStorage.getItem('window_state')
+        if (savedState) {
+          const { width, height, x, y } = JSON.parse(savedState)
+          await appWindow.setSize({ width, height })
+          await appWindow.setPosition({ x, y })
+        }
+      } catch (error) {
+        console.error('Failed to restore window state:', error)
+      }
+    }
+
+    const saveWindowState = async () => {
+      try {
+        const size = await appWindow.innerSize()
+        const position = await appWindow.innerPosition()
+        const state = {
+          width: size.width,
+          height: size.height,
+          x: position.x,
+          y: position.y
+        }
+        localStorage.setItem('window_state', JSON.stringify(state))
+      } catch (error) {
+        console.error('Failed to save window state:', error)
+      }
+    }
+
     onMounted(async () => {
+      await restoreWindowState()
+
       if (config.value.checkUpdatesOnStartup) {
         await handleViewChange('updates')
       } else {
@@ -355,6 +387,15 @@ export default {
       }
 
       setupAutoRefresh()
+
+      let saveTimeout
+      const debouncedSave = () => {
+        clearTimeout(saveTimeout)
+        saveTimeout = setTimeout(saveWindowState, 500)
+      }
+
+      appWindow.onResized(debouncedSave)
+      appWindow.onMoved(debouncedSave)
 
       listen('install-log', (event) => {
         logs.value.push(event.payload)
@@ -389,10 +430,11 @@ export default {
       })
     })
 
-    onUnmounted(() => {
+    onUnmounted(async () => {
       if (refreshInterval) {
         clearInterval(refreshInterval)
       }
+      await saveWindowState()
     })
 
     return {
