@@ -138,19 +138,18 @@ Production:
 
 The app uses `pkexec` for privilege escalation when installing/removing packages. 
 
-**⚠️ IMPORTANT: By default, you'll be asked for your password on EVERY operation!**
+**You have two options:**
 
-**To fix this:**
-1. Open GuiMan Settings (gear icon in sidebar)
-2. Click **"Install Now"** under "Password-Free Package Management"
-3. Enter your password one time
-4. Restart GuiMan
+1. **With Password Prompts** (Default)
+   - Enter your password for each package operation
+   - More secure if you prefer manual confirmation
 
-**What this does:**
-- Installs a polkit policy that removes password prompts
-- You'll authenticate once when opening GuiMan, then no more passwords needed
-- Password-free for your entire desktop session
-- Secure and proper way (same method used by GNOME Software, KDE Discover, etc.)
+2. **Password-Free Mode** (Optional - Install from Settings)
+   - Go to Settings → System Integration → Install Policy
+   - Enter password once, never asked again for your session
+   - Same method used by GNOME Software, KDE Discover, etc.
+
+**Your choice!** Both options are secure. Install the policy if you find password prompts annoying.
 
 ### Navigation
 
@@ -162,21 +161,21 @@ The app uses `pkexec` for privilege escalation when installing/removing packages
 
 ### Operations
 
-1. **First Time Setup**: Open Settings → Install polkit policy (removes password prompts)
-2. **Search**: Type package name and press Enter or click Search
-3. **Install**: Click Install button on any package (confirmation optional)
-4. **Remove**: Click Remove button on installed packages (confirmation optional)
-5. **Batch Operations**: Select multiple packages and use bottom bar actions
-6. **System Update**: Click "Update System" button in top bar
-7. **View Details**: Click on any package name to see detailed information
-8. **Settings**: Access comprehensive settings from sidebar
-9. **Clean Cache**: Remove old package files from settings panel
+1. **Search**: Type package name and press Enter or click Search
+2. **Install**: Click Install button on any package (confirmation optional)
+3. **Remove**: Click Remove button on installed packages (confirmation optional)
+4. **Batch Operations**: Select multiple packages and use bottom bar actions
+5. **System Update**: Click "Update System" button in top bar
+6. **View Details**: Click on any package name to see detailed information
+7. **Settings**: Access comprehensive settings from sidebar
+8. **Clean Cache**: Remove old package files from settings panel
+9. **Optional**: Install polkit policy from Settings to skip password prompts
 
 ### Settings Panel
 
 Access settings by clicking the gear icon in the sidebar:
 
-- **System Integration**: Install polkit policy for password-free operations (RECOMMENDED)
+- **System Integration**: Optional polkit policy for password-free operations
 - **General Settings**: Confirmations, notifications, descriptions
 - **Auto-Refresh**: Configure automatic package list updates
 - **AUR Support**: Enable experimental AUR helper integration
