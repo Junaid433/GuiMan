@@ -81,6 +81,7 @@ import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
 import { appWindow } from '@tauri-apps/api/window'
+import { sendNotification, isPermissionGranted, requestPermission } from '@tauri-apps/api/notification'
 import Sidebar from './components/Sidebar.vue'
 import SearchBar from './components/SearchBar.vue'
 import PackageTable from './components/PackageTable.vue'
@@ -245,7 +246,7 @@ export default {
             packages.value = await invoke('list_installed')
             break
           case 'available':
-            packages.value = []
+            packages.value = await invoke('get_popular_packages')
             break
           case 'updates':
             packages.value = await invoke('check_updates')
@@ -460,11 +461,33 @@ export default {
       }
     }
 
+    const sendNotif = async (title, body) => {
+      if (!config.value.showNotifications) return
+      
+      try {
+        let permissionGranted = await isPermissionGranted()
+        if (!permissionGranted) {
+          const permission = await requestPermission()
+          permissionGranted = permission === 'granted'
+        }
+        if (permissionGranted) {
+          sendNotification({ title, body })
+        }
+      } catch (error) {
+        console.error('Notification error:', error)
+      }
+    }
+
+
     onMounted(async () => {
       await restoreWindowState()
 
       if (config.value.checkUpdatesOnStartup) {
         await handleViewChange('updates')
+        const updateCount = packages.value.length
+        if (updateCount > 0) {
+          await sendNotif('Updates Available', `${updateCount} package update${updateCount > 1 ? 's' : ''} available`)
+        }
       } else {
         await handleViewChange('installed')
       }
@@ -500,18 +523,33 @@ export default {
         operationCompleted.value = true
         operationSuccess.value = event.payload
         logs.value.push(event.payload ? '✓ Installation complete!' : '✗ Installation failed!')
+        if (event.payload) {
+          sendNotif('Installation Complete', 'Package installation finished successfully')
+        } else {
+          sendNotif('Installation Failed', 'Package installation encountered an error')
+        }
       })
 
       listen('remove-complete', (event) => {
         operationCompleted.value = true
         operationSuccess.value = event.payload
         logs.value.push(event.payload ? '✓ Removal complete!' : '✗ Removal failed!')
+        if (event.payload) {
+          sendNotif('Removal Complete', 'Package removal finished successfully')
+        } else {
+          sendNotif('Removal Failed', 'Package removal encountered an error')
+        }
       })
 
       listen('update-complete', (event) => {
         operationCompleted.value = true
         operationSuccess.value = event.payload
         logs.value.push(event.payload ? '✓ Update complete!' : '✗ Update failed!')
+        if (event.payload) {
+          sendNotif('System Update Complete', 'All packages updated successfully')
+        } else {
+          sendNotif('System Update Failed', 'System update encountered an error')
+        }
       })
 
       listen('cache-clean-complete', (event) => {

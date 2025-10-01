@@ -510,6 +510,66 @@ async fn check_polkit_policy() -> Result<bool, String> {
     Ok(std::path::Path::new("/usr/share/polkit-1/actions/com.guiman.pkexec.policy").exists())
 }
 
+#[tauri::command]
+async fn get_popular_packages() -> Result<Vec<PackageInfo>, String> {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg("pacman -Slq | shuf | head -50")
+        .output()
+        .map_err(|e| format!("Failed to get random packages: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let package_names: Vec<&str> = stdout.lines().collect();
+
+    let mut packages = Vec::new();
+
+    for pkg_name in package_names {
+        let output = Command::new("pacman")
+            .args(&["-Si", pkg_name])
+            .output()
+            .ok();
+
+        if let Some(info) = output {
+            let info_str = String::from_utf8_lossy(&info.stdout);
+            
+            let mut name = pkg_name.to_string();
+            let mut version = String::new();
+            let mut repo = String::new();
+            let mut description = String::new();
+
+            for line in info_str.lines() {
+                if line.starts_with("Repository") {
+                    repo = line.split(':').nth(1).unwrap_or("").trim().to_string();
+                } else if line.starts_with("Version") {
+                    version = line.split(':').nth(1).unwrap_or("").trim().to_string();
+                } else if line.starts_with("Description") {
+                    description = line.split(':').nth(1).unwrap_or("").trim().to_string();
+                } else if line.starts_with("Name") {
+                    name = line.split(':').nth(1).unwrap_or(pkg_name).trim().to_string();
+                }
+            }
+
+            let installed_check = Command::new("pacman")
+                .args(&["-Q", &name])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+
+            if !version.is_empty() {
+                packages.push(PackageInfo {
+                    name,
+                    version,
+                    repo,
+                    description,
+                    installed: installed_check,
+                });
+            }
+        }
+    }
+
+    Ok(packages)
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -526,7 +586,8 @@ fn main() {
             export_package_list,
             get_cache_size,
             install_polkit_policy,
-            check_polkit_policy
+            check_polkit_policy,
+            get_popular_packages
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
