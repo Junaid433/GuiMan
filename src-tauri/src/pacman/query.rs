@@ -143,7 +143,7 @@ pub fn get_package_history() -> Result<Vec<PackageInfo>, String> {
     let mut history = Vec::new();
 
     for line in stdout.lines() {
-        if line.contains("installed") || line.contains("removed") || line.contains("upgraded") {
+        if line.contains("[ALPM]") && (line.contains("installed") || line.contains("removed") || line.contains("upgraded")) {
             if let Some(parsed) = parse_log_entry(line) {
                 history.push(parsed);
             }
@@ -157,58 +157,79 @@ pub fn get_package_history() -> Result<Vec<PackageInfo>, String> {
 
 /// Parse a single pacman log entry
 fn parse_log_entry(line: &str) -> Option<PackageInfo> {
-    let parts: Vec<&str> = line.split(']').collect();
-    if parts.len() < 2 {
+    // Format: [2025-10-02T14:00:05+0600] [ALPM] installed lsof (4.99.5-2)
+    let parts: Vec<&str> = line.split("] [ALPM] ").collect();
+    if parts.len() != 2 {
         return None;
     }
 
     let timestamp = parts[0].trim_start_matches('[').trim();
     let content = parts[1].trim();
 
-    if content.contains("installed") {
-        let pkg_parts: Vec<&str> = content.split_whitespace().collect();
-        if pkg_parts.len() >= 3 {
+    if content.starts_with("installed ") {
+        // Format: "installed lsof (4.99.5-2)"
+        let rest = content.strip_prefix("installed ").unwrap_or("");
+        if let Some(open_paren) = rest.find(" (") {
+            let name = rest[..open_paren].to_string();
+            let version_part = &rest[open_paren + 2..];
+            let version = version_part.trim_end_matches(')').to_string();
+            
             return Some(PackageInfo {
-                name: pkg_parts[2].to_string(),
-                version: if pkg_parts.len() > 3 {
-                    pkg_parts[3].trim_matches('(').trim_matches(')').to_string()
-                } else {
-                    String::new()
-                },
-                repo: "history".to_string(),
-                description: format!("Installed at {}", timestamp),
+                name,
+                version,
+                repo: "log".to_string(),
+                description: format!("📦 Installed on {}", format_timestamp(timestamp)),
                 installed: false,
             });
         }
-    } else if content.contains("removed") {
-        let pkg_parts: Vec<&str> = content.split_whitespace().collect();
-        if pkg_parts.len() >= 3 {
+    } else if content.starts_with("removed ") {
+        // Format: "removed package-name (version)"
+        let rest = content.strip_prefix("removed ").unwrap_or("");
+        if let Some(open_paren) = rest.find(" (") {
+            let name = rest[..open_paren].to_string();
+            let version_part = &rest[open_paren + 2..];
+            let version = version_part.trim_end_matches(')').to_string();
+            
             return Some(PackageInfo {
-                name: pkg_parts[2].to_string(),
-                version: if pkg_parts.len() > 3 {
-                    pkg_parts[3].trim_matches('(').trim_matches(')').to_string()
-                } else {
-                    String::new()
-                },
-                repo: "history".to_string(),
-                description: format!("Removed at {}", timestamp),
+                name,
+                version,
+                repo: "log".to_string(),
+                description: format!("🗑️ Removed on {}", format_timestamp(timestamp)),
                 installed: false,
             });
         }
-    } else if content.contains("upgraded") {
-        let pkg_parts: Vec<&str> = content.split_whitespace().collect();
-        if pkg_parts.len() >= 4 {
+    } else if content.starts_with("upgraded ") {
+        // Format: "upgraded package-name (old-version -> new-version)"
+        let rest = content.strip_prefix("upgraded ").unwrap_or("");
+        if let Some(open_paren) = rest.find(" (") {
+            let name = rest[..open_paren].to_string();
+            let version_part = &rest[open_paren + 2..];
+            let version_info = version_part.trim_end_matches(')');
+            
+            // Extract new version (after ->)
+            let version = if let Some(arrow_pos) = version_info.find(" -> ") {
+                version_info[arrow_pos + 4..].to_string()
+            } else {
+                version_info.to_string()
+            };
+            
             return Some(PackageInfo {
-                name: pkg_parts[2].to_string(),
-                version: pkg_parts[4].trim_matches('(').trim_matches(')').to_string(),
-                repo: "history".to_string(),
-                description: format!("Upgraded at {} from {}", timestamp, pkg_parts[3]),
+                name,
+                version,
+                repo: "log".to_string(),
+                description: format!("⬆️ Upgraded on {}", format_timestamp(timestamp)),
                 installed: false,
             });
         }
     }
 
     None
+}
+
+/// Format timestamp for display
+fn format_timestamp(timestamp: &str) -> String {
+    // Convert ISO timestamp to readable format
+    timestamp.split('T').next().unwrap_or(timestamp).to_string()
 }
 
 /// Get detailed package information

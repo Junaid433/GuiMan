@@ -56,3 +56,30 @@ pub async fn remove_package(window: Window, pkg: String) -> Result<CommandResult
     pacman::remove_package_async(window, pkg).await
 }
 
+// AUR Advanced Features
+
+#[tauri::command]
+pub async fn vote_aur_package(package: String, helper: String) -> Result<String, String> {
+    aur::vote_aur_package(&package, &helper)
+}
+
+#[tauri::command]
+pub async fn flag_aur_package(package: String, helper: String, comment: Option<String>) -> Result<String, String> {
+    aur::flag_aur_package(&package, &helper, comment)
+}
+
+#[tauri::command]
+pub async fn adopt_aur_package(package: String, helper: String) -> Result<String, String> {
+    aur::adopt_aur_package(&package, &helper)
+}
+
+#[tauri::command]
+pub async fn get_aur_build_info(package: String, helper: String) -> Result<String, String> {
+    aur::get_aur_build_info(&package, &helper)
+}
+
+#[tauri::command]
+pub async fn install_aur_with_options(package: String, helper: String, options: Vec<String>) -> Result<String, String> {
+    aur::install_aur_with_options(&package, &helper, options)
+}
+
