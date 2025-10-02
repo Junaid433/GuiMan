@@ -7,6 +7,7 @@
         @toggle-theme="toggleTheme"
         @open-settings="showSettingsModal = true"
         :dark-mode="darkMode"
+        :aur-enabled="config.aurSupport"
       />
       
       <div class="flex-1 flex flex-col overflow-hidden">
@@ -14,6 +15,13 @@
           v-model="searchQuery" 
           @search="handleSearch"
           @update-system="handleUpdateSystem"
+        />
+        
+        <FilterBar 
+          :filters="filters"
+          @update:filters="updateFilters"
+          :filtered-count="displayPackages.length"
+          :show-aur="config.aurSupport"
         />
         
         <div class="flex-1 overflow-hidden">
@@ -84,6 +92,7 @@ import { appWindow } from '@tauri-apps/api/window'
 import { sendNotification, isPermissionGranted, requestPermission } from '@tauri-apps/api/notification'
 import Sidebar from './components/Sidebar.vue'
 import SearchBar from './components/SearchBar.vue'
+import FilterBar from './components/FilterBar.vue'
 import PackageTable from './components/PackageTable.vue'
 import StatusBar from './components/StatusBar.vue'
 import LogModal from './components/LogModal.vue'
@@ -97,6 +106,7 @@ export default {
   components: {
     Sidebar,
     SearchBar,
+    FilterBar,
     PackageTable,
     StatusBar,
     LogModal,
@@ -123,11 +133,42 @@ export default {
     const showDetailsModal = ref(false)
     const selectedPackageForDetails = ref(null)
     const packageDetails = ref({})
+    const filters = ref({
+      repository: 'all',
+      status: 'all',
+      search: ''
+    })
     let refreshInterval = null
 
     const displayPackages = computed(() => {
-      return packages.value
+      let filtered = packages.value
+
+      if (filters.value.repository !== 'all') {
+        filtered = filtered.filter(pkg => pkg.repo === filters.value.repository)
+      }
+
+      if (filters.value.status === 'installed') {
+        filtered = filtered.filter(pkg => pkg.installed)
+      } else if (filters.value.status === 'not-installed') {
+        filtered = filtered.filter(pkg => !pkg.installed)
+      } else if (filters.value.status === 'update-required') {
+        filtered = filtered.filter(pkg => pkg.description && pkg.description.includes('→'))
+      }
+
+      if (filters.value.search.trim()) {
+        const searchLower = filters.value.search.toLowerCase()
+        filtered = filtered.filter(pkg => 
+          pkg.name.toLowerCase().includes(searchLower) ||
+          (pkg.description && pkg.description.toLowerCase().includes(searchLower))
+        )
+      }
+
+      return filtered
     })
+
+    const updateFilters = (newFilters) => {
+      filters.value = { ...newFilters }
+    }
 
     const toggleTheme = () => {
       darkMode.value = !darkMode.value
@@ -170,6 +211,7 @@ export default {
     }
 
     const handleInstallWithConfirm = (pkg) => {
+      showDetailsModal.value = false
       if (config.value.confirmActions) {
         showConfirm(
           'Install Package',
@@ -184,6 +226,7 @@ export default {
     }
 
     const handleRemoveWithConfirm = (pkg) => {
+      showDetailsModal.value = false
       if (config.value.confirmActions) {
         showConfirm(
           'Remove Package',
@@ -248,6 +291,9 @@ export default {
             break
           case 'popular':
             packages.value = await invoke('get_popular_packages')
+            break
+          case 'aur':
+            packages.value = await invoke('list_aur_packages', { helper: config.value.aurHelper })
             break
           case 'updates':
             packages.value = await invoke('check_updates')
@@ -336,9 +382,12 @@ export default {
     const handleInstallSelected = async () => {
       if (selectedPackages.value.length === 0) return
 
+      const packagesToInstall = [...selectedPackages.value]
+      const packageNames = packagesToInstall.map(p => p.name).join(' ')
+      const packageCount = packagesToInstall.length
+
       const doInstall = async () => {
-        const packageNames = selectedPackages.value.map(p => p.name).join(' ')
-        currentOperation.value = `Installing ${selectedPackages.value.length} packages`
+        currentOperation.value = `Installing ${packageCount} packages`
         logs.value = []
         operationCompleted.value = false
         operationSuccess.value = false
@@ -356,10 +405,10 @@ export default {
       }
 
       if (config.value.confirmActions) {
-        const packageList = selectedPackages.value.map(p => p.name).join(', ')
+        const packageList = packagesToInstall.map(p => p.name).join(', ')
         showConfirm(
           'Install Multiple Packages',
-          `Install ${selectedPackages.value.length} packages:\n${packageList}`,
+          `Install ${packageCount} packages:\n${packageList}`,
           doInstall,
           'warning',
           'Install All'
@@ -372,9 +421,12 @@ export default {
     const handleRemoveSelected = async () => {
       if (selectedPackages.value.length === 0) return
 
+      const packagesToRemove = [...selectedPackages.value]
+      const packageNames = packagesToRemove.map(p => p.name).join(' ')
+      const packageCount = packagesToRemove.length
+
       const doRemove = async () => {
-        const packageNames = selectedPackages.value.map(p => p.name).join(' ')
-        currentOperation.value = `Removing ${selectedPackages.value.length} packages`
+        currentOperation.value = `Removing ${packageCount} packages`
         logs.value = []
         operationCompleted.value = false
         operationSuccess.value = false
@@ -392,10 +444,10 @@ export default {
       }
 
       if (config.value.confirmActions) {
-        const packageList = selectedPackages.value.map(p => p.name).join(', ')
+        const packageList = packagesToRemove.map(p => p.name).join(', ')
         showConfirm(
           'Remove Multiple Packages',
-          `Remove ${selectedPackages.value.length} packages:\n${packageList}`,
+          `Remove ${packageCount} packages:\n${packageList}`,
           doRemove,
           'danger',
           'Remove All'
@@ -579,6 +631,8 @@ export default {
       showDetailsModal,
       selectedPackageForDetails,
       packageDetails,
+      filters,
+      updateFilters,
       toggleTheme,
       saveSettings,
       handleViewChange,

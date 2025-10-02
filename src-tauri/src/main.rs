@@ -229,7 +229,7 @@ async fn remove_package(window: Window, pkg: String) -> Result<CommandResult, St
     let pkg_clone = pkg.clone();
     tokio::spawn(async move {
         let mut child = Command::new("pkexec")
-            .args(&["pacman", "-R", "--noconfirm", &pkg_clone])
+            .args(&["pacman", "-Rs", "--noconfirm", &pkg_clone])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -757,6 +757,51 @@ async fn get_popular_packages() -> Result<Vec<PackageInfo>, String> {
     Ok(result)
 }
 
+#[tauri::command]
+async fn list_aur_packages(helper: String) -> Result<Vec<PackageInfo>, String> {
+    let helper_cmd = match helper.as_str() {
+        "yay" => "yay",
+        "paru" => "paru",
+        _ => return Err("Invalid AUR helper".to_string()),
+    };
+
+    let check_helper = Command::new("which")
+        .arg(helper_cmd)
+        .output()
+        .ok();
+
+    if check_helper.is_none() || !check_helper.unwrap().status.success() {
+        return Err(format!("{} is not installed. Please install it first.", helper_cmd));
+    }
+
+    let output = Command::new(helper_cmd)
+        .args(&["-Sl", "aur"])
+        .output()
+        .map_err(|e| format!("Failed to list AUR packages: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut packages = Vec::new();
+
+    for line in stdout.lines().take(50) {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 3 {
+            let name = parts[1];
+            let version = parts[2];
+            let installed = line.contains("[installed]");
+
+            packages.push(PackageInfo {
+                name: name.to_string(),
+                version: version.to_string(),
+                repo: "aur".to_string(),
+                description: String::new(),
+                installed,
+            });
+        }
+    }
+
+    Ok(packages)
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -774,7 +819,8 @@ fn main() {
             get_cache_size,
             install_polkit_policy,
             check_polkit_policy,
-            get_popular_packages
+            get_popular_packages,
+            list_aur_packages
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
