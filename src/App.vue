@@ -17,13 +17,6 @@
           @update-system="handleUpdateSystem"
         />
         
-        <FilterBar 
-          :filters="filters"
-          @update:filters="updateFilters"
-          :filtered-count="displayPackages.length"
-          :show-aur="config.aurSupport"
-        />
-        
         <div class="flex-1 overflow-hidden">
           <PackageTable 
             :packages="displayPackages"
@@ -56,6 +49,7 @@
 
       <SettingsModal
         v-if="showSettingsModal"
+        ref="settingsModal"
         :config="config"
         @close="showSettingsModal = false"
         @save="saveSettings"
@@ -85,14 +79,13 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, onUnmounted } from 'vue'
+import { ref, onMounted, computed, onUnmounted, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
 import { appWindow } from '@tauri-apps/api/window'
 import { sendNotification, isPermissionGranted, requestPermission } from '@tauri-apps/api/notification'
 import Sidebar from './components/Sidebar.vue'
 import SearchBar from './components/SearchBar.vue'
-import FilterBar from './components/FilterBar.vue'
 import PackageTable from './components/PackageTable.vue'
 import StatusBar from './components/StatusBar.vue'
 import LogModal from './components/LogModal.vue'
@@ -106,7 +99,6 @@ export default {
   components: {
     Sidebar,
     SearchBar,
-    FilterBar,
     PackageTable,
     StatusBar,
     LogModal,
@@ -128,47 +120,18 @@ export default {
     const config = ref(configManager.config)
     const darkMode = ref(config.value.theme === 'dark')
     const showSettingsModal = ref(false)
+    const settingsModal = ref(null)
+    const cacheJustCleaned = ref(false)
     const showConfirmDialog = ref(false)
     const confirmDialog = ref({})
     const showDetailsModal = ref(false)
     const selectedPackageForDetails = ref(null)
     const packageDetails = ref({})
-    const filters = ref({
-      repository: 'all',
-      status: 'all',
-      search: ''
-    })
     let refreshInterval = null
 
     const displayPackages = computed(() => {
-      let filtered = packages.value
-
-      if (filters.value.repository !== 'all') {
-        filtered = filtered.filter(pkg => pkg.repo === filters.value.repository)
-      }
-
-      if (filters.value.status === 'installed') {
-        filtered = filtered.filter(pkg => pkg.installed)
-      } else if (filters.value.status === 'not-installed') {
-        filtered = filtered.filter(pkg => !pkg.installed)
-      } else if (filters.value.status === 'update-required') {
-        filtered = filtered.filter(pkg => pkg.description && pkg.description.includes('→'))
-      }
-
-      if (filters.value.search.trim()) {
-        const searchLower = filters.value.search.toLowerCase()
-        filtered = filtered.filter(pkg => 
-          pkg.name.toLowerCase().includes(searchLower) ||
-          (pkg.description && pkg.description.toLowerCase().includes(searchLower))
-        )
-      }
-
-      return filtered
+      return packages.value
     })
-
-    const updateFilters = (newFilters) => {
-      filters.value = { ...newFilters }
-    }
 
     const toggleTheme = () => {
       darkMode.value = !darkMode.value
@@ -244,9 +207,20 @@ export default {
       selectedPackageForDetails.value = pkg
       packageDetails.value = {}
       
+      showDetailsModal.value = true
+      
       try {
-        const info = await invoke('get_package_info', { pkg: pkg.name })
-        const size = info.installed_size || info.download_size || 'Unknown'
+        const info = await invoke('get_package_info', { 
+          pkg: pkg.name,
+          repo: pkg.repo || 'unknown',
+          is_installed: pkg.installed || false
+        })
+        let size = info.installed_size || info.download_size || 'Unknown'
+        
+        if (size === 'Unknown' && pkg.repo === 'aur' && !pkg.installed) {
+          size = 'Unknown (AUR packages are built from source)'
+        }
+        
         packageDetails.value = {
           size: size,
           url: info.url || '',
@@ -257,20 +231,20 @@ export default {
       } catch (error) {
         console.error('Failed to get package info:', error)
       }
-      
-      showDetailsModal.value = true
     }
 
     const handleCleanCache = async () => {
       showSettingsModal.value = false
-      currentOperation.value = 'Cleaning package cache'
+      currentOperation.value = 'Cleaning package cache (pacman -Scc + AUR helper -Scc)'
       logs.value = []
       operationCompleted.value = false
       operationSuccess.value = false
       showLogModal.value = true
 
       try {
-        await invoke('clean_cache')
+        await invoke('clean_cache', { 
+          aurHelper: config.value.aurHelper || 'yay' 
+        })
       } catch (error) {
         logs.value.push(`Error: ${error}`)
         operationCompleted.value = true
@@ -329,7 +303,14 @@ export default {
       
       loading.value = true
       try {
-        packages.value = await invoke('search_package', { query: searchQuery.value })
+        const aurEnabled = config.value.aurSupport === true
+        const aurHelper = config.value.aurHelper || 'yay'
+        
+        packages.value = await invoke('search_package', { 
+          query: searchQuery.value,
+          aurEnabled: aurEnabled,
+          aurHelper: aurHelper
+        })
         activeView.value = 'search'
       } catch (error) {
         console.error('Search error:', error)
@@ -561,7 +542,7 @@ export default {
         logs.value.push(event.payload)
       })
 
-      listen('cache-clean-log', (event) => {
+      listen('cache-clean-output', (event) => {
         logs.value.push(event.payload)
       })
 
@@ -598,10 +579,13 @@ export default {
         }
       })
 
-      listen('cache-clean-complete', (event) => {
+      listen('cache-clean-complete', async (event) => {
         operationCompleted.value = true
         operationSuccess.value = event.payload
-        logs.value.push(event.payload ? '✓ Cache cleaned!' : '✗ Cache cleaning failed!')
+        logs.value.push(event.payload)
+        
+        // Mark that cache was just cleaned so we refresh when modal reopens
+        cacheJustCleaned.value = true
       })
     })
 
@@ -626,13 +610,12 @@ export default {
       darkMode,
       config,
       showSettingsModal,
+      settingsModal,
       showConfirmDialog,
       confirmDialog,
       showDetailsModal,
       selectedPackageForDetails,
       packageDetails,
-      filters,
-      updateFilters,
       toggleTheme,
       saveSettings,
       handleViewChange,

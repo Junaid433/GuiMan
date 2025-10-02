@@ -122,23 +122,6 @@
             </div>
           </div>
 
-          <div v-if="activeTab === 'refresh'" class="space-y-4">
-            <div class="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-700">
-              <div>
-                <div class="text-sm font-medium text-gray-900 dark:text-white">Enable auto-refresh</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">Periodically refresh package list</div>
-              </div>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" v-model="localConfig.autoRefresh" class="sr-only peer">
-                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-
-            <div v-if="localConfig.autoRefresh">
-              <label class="text-sm font-medium text-gray-900 dark:text-white">Interval (seconds)</label>
-              <input type="number" v-model.number="localConfig.refreshInterval" min="60" max="3600" class="mt-2 w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white">
-            </div>
-          </div>
 
           <div v-if="activeTab === 'aur'" class="space-y-4">
             <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
@@ -166,6 +149,29 @@
           </div>
 
           <div v-if="activeTab === 'cache'" class="space-y-4">
+            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between pb-3 border-b border-blue-200 dark:border-blue-700">
+                  <div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">Pacman Cache</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">/var/cache/pacman/pkg</div>
+                  </div>
+                  <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {{ cacheSizes.pacman }}
+                  </div>
+                </div>
+                <div v-if="localConfig.aurSupport" class="flex items-center justify-between">
+                  <div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">{{ (localConfig.aurHelper || 'aur').charAt(0).toUpperCase() + (localConfig.aurHelper || 'aur').slice(1) }} Cache</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ cacheSizes.yay_path }}</div>
+                  </div>
+                  <div class="text-2xl font-bold text-pink-600 dark:text-pink-400">
+                    {{ cacheSizes.yay }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-700">
               <div>
                 <div class="text-sm font-medium text-gray-900 dark:text-white">Keep package cache</div>
@@ -177,9 +183,14 @@
               </label>
             </div>
 
-            <button @click="$emit('clean-cache')" class="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors">
-              Clean Package Cache
-            </button>
+            <div class="space-y-2">
+              <button @click="refreshCacheSizes" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+                Refresh Cache Sizes
+              </button>
+              <button @click="$emit('clean-cache')" class="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors">
+                Clean Package Cache
+              </button>
+            </div>
           </div>
 
           <div v-if="activeTab === 'advanced'" class="space-y-4">
@@ -251,7 +262,6 @@ export default {
       tabs: [
         { id: 'system', label: 'System' },
         { id: 'general', label: 'General' },
-        { id: 'refresh', label: 'Auto-Refresh' },
         { id: 'aur', label: 'AUR' },
         { id: 'cache', label: 'Cache' },
         { id: 'advanced', label: 'Advanced' },
@@ -260,7 +270,12 @@ export default {
       localConfig: { ...this.config },
       polkitInstalled: false,
       installingPolkit: false,
-      checkingUpdate: false
+      checkingUpdate: false,
+      cacheSizes: {
+        pacman: 'Calculating...',
+        yay: '0',
+        yay_path: '~/.cache/yay'
+      }
     }
   },
   async mounted() {
@@ -269,8 +284,19 @@ export default {
     } catch (error) {
       console.error('Failed to check polkit policy:', error)
     }
+    
+    await this.refreshCacheSizes()
   },
   methods: {
+    async refreshCacheSizes() {
+      try {
+        const sizes = await invoke('get_cache_size')
+        this.cacheSizes = sizes
+      } catch (error) {
+        console.error('Failed to get cache size:', error)
+        this.cacheSizes.pacman = 'Unknown'
+      }
+    },
     async installPolkit() {
       this.installingPolkit = true
       try {

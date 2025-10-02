@@ -1,0 +1,930 @@
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+
+use serde::{Deserialize, Serialize};
+use std::process::{Command, Stdio};
+use std::io::{BufRead, BufReader, Read};
+use tauri::Window;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct PackageInfo {
+    name: String,
+    version: String,
+    repo: String,
+    description: String,
+    installed: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CommandResult {
+    success: bool,
+    message: String,
+    data: Option<serde_json::Value>,
+}
+
+#[tauri::command]
+async fn search_package(query: String, aur_enabled: Option<bool>, aur_helper: Option<String>) -> Result<Vec<PackageInfo>, String> {
+    use fuzzy_matcher::FuzzyMatcher;
+    use fuzzy_matcher::skim::SkimMatcherV2;
+
+    if query.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let matcher = SkimMatcherV2::default();
+    let mut scored_packages: Vec<(i64, PackageInfo)> = Vec::new();
+
+    // Search official repositories
+    let output = Command::new("pacman")
+        .args(&["-Sl"])
+        .output()
+        .map_err(|e| format!("Failed to execute pacman: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 3 {
+            let repo = parts[0];
+            let name = parts[1];
+            let version = parts[2];
+            let installed = line.contains("[installed]");
+
+            let name_score = matcher.fuzzy_match(name, &query);
+            
+            if let Some(score) = name_score {
+                scored_packages.push((score, PackageInfo {
+                    name: name.to_string(),
+                    version: version.to_string(),
+                    repo: repo.to_string(),
+                    description: String::new(),
+                    installed,
+                }));
+            }
+        }
+    }
+
+    if aur_enabled.unwrap_or(false) {
+        let helper = aur_helper.unwrap_or_else(|| "yay".to_string());
+        let helper_cmd = match helper.as_str() {
+            "yay" => "yay",
+            "paru" => "paru",
+            _ => "yay",
+        };
+
+        let check_helper = Command::new("which")
+            .arg(helper_cmd)
+            .output()
+            .ok();
+
+        if let Some(check) = check_helper {
+            if check.status.success() {
+                // Use -Ss with the query to get actual version info
+                let aur_output = Command::new(helper_cmd)
+                    .args(&["-Ss", &query])
+                    .output()
+                    .ok();
+
+                if let Some(aur_result) = aur_output {
+                    if aur_result.status.success() {
+                        let aur_stdout = String::from_utf8_lossy(&aur_result.stdout);
+                        let aur_lines: Vec<&str> = aur_stdout.lines().collect();
+                        let mut i = 0;
+                        
+                        while i < aur_lines.len() {
+                            let line = aur_lines[i];
+                            
+                            // Look for lines with "aur/" - these contain package info
+                            if line.contains("aur/") {
+                                // Strip ANSI escape sequences
+                                let clean = line
+                                    .replace("\x1b[1m", "")
+                                    .replace("\x1b[0m", "")
+                                    .replace("\x1b]8;;", "")
+                                    .replace("\x1b\\", "");
+                                
+                                // Extract package name - find "aur/" and get the next word
+                                if let Some(aur_pos) = clean.find("aur/") {
+                                    let after_aur = &clean[aur_pos + 4..];
+                                    let parts: Vec<&str> = after_aur.split_whitespace().collect();
+                                    
+                                    if !parts.is_empty() {
+                                        let name = parts[0];
+                                        let version = if parts.len() > 1 {
+                                            parts[1].to_string()
+                                        } else {
+                                            "unknown".to_string()
+                                        };
+                                        let installed = line.contains("[installed]");
+                                        
+                                        let name_score = matcher.fuzzy_match(name, &query);
+                                        
+                                        if let Some(score) = name_score {
+                                            // Get description from next line if available
+                                            let description = if i + 1 < aur_lines.len() {
+                                                let next_line = aur_lines[i + 1].trim();
+                                                if !next_line.contains("aur/") && !next_line.is_empty() {
+                                                    next_line.to_string()
+                                                } else {
+                                                    String::new()
+                                                }
+                                            } else {
+                                                String::new()
+                                            };
+                                            
+                                            scored_packages.push((score, PackageInfo {
+                                                name: name.to_string(),
+                                                version,
+                                                repo: "aur".to_string(),
+                                                description,
+                                                installed,
+                                            }));
+                                        }
+                                    }
+                                }
+                                i += 2; // Skip description line
+                            } else {
+                                i += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    scored_packages.sort_by(|a, b| b.0.cmp(&a.0));
+    scored_packages.truncate(50);
+
+    let mut packages: Vec<PackageInfo> = scored_packages.into_iter()
+        .map(|(_, pkg)| pkg)
+        .collect();
+
+    // Get descriptions for official packages only
+    let official_packages: Vec<String> = packages.iter()
+        .filter(|p| p.repo != "aur")
+        .map(|p| p.name.clone())
+        .collect();
+
+    if !official_packages.is_empty() {
+        let info_output = Command::new("pacman")
+            .args(&["-Si"])
+            .args(&official_packages)
+            .output()
+            .ok();
+
+        if let Some(info) = info_output {
+            let info_str = String::from_utf8_lossy(&info.stdout);
+            let mut current_name = String::new();
+            let mut current_desc = String::new();
+
+            for line in info_str.lines() {
+                if line.starts_with("Name") {
+                    if !current_name.is_empty() && !current_desc.is_empty() {
+                        if let Some(pkg) = packages.iter_mut().find(|p| p.name == current_name && p.repo != "aur") {
+                            pkg.description = current_desc.clone();
+                        }
+                    }
+                    current_name = line.split(':').nth(1).unwrap_or("").trim().to_string();
+                    current_desc = String::new();
+                } else if line.starts_with("Description") {
+                    current_desc = line.split(':').nth(1).unwrap_or("").trim().to_string();
+                }
+            }
+
+            if !current_name.is_empty() && !current_desc.is_empty() {
+                if let Some(pkg) = packages.iter_mut().find(|p| p.name == current_name && p.repo != "aur") {
+                    pkg.description = current_desc;
+                }
+            }
+        }
+    }
+
+    Ok(packages)
+}
+
+#[tauri::command]
+async fn list_installed() -> Result<Vec<PackageInfo>, String> {
+    let output = Command::new("pacman")
+        .args(&["-Q"])
+        .output()
+        .map_err(|e| format!("Failed to execute pacman: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut packages = Vec::new();
+    
+    let sync_output = Command::new("pacman")
+        .args(&["-Sl"])
+        .output()
+        .ok();
+    
+    let mut repo_map = std::collections::HashMap::new();
+    if let Some(sync) = sync_output {
+        let sync_str = String::from_utf8_lossy(&sync.stdout);
+        for sync_line in sync_str.lines() {
+            let parts: Vec<&str> = sync_line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                repo_map.insert(parts[1].to_string(), parts[0].to_string());
+            }
+        }
+    }
+    
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 2 {
+            let pkg_name = parts[0].to_string();
+            let repo = repo_map.get(&pkg_name)
+                .cloned()
+                .unwrap_or_else(|| "local".to_string());
+            
+            packages.push(PackageInfo {
+                name: pkg_name,
+                version: parts[1].to_string(),
+                repo,
+                description: String::new(),
+                installed: true,
+            });
+        }
+    }
+
+    Ok(packages)
+}
+
+#[tauri::command]
+async fn install_package(window: Window, pkg: String) -> Result<CommandResult, String> {
+    let pkg_clone = pkg.clone();
+    tokio::spawn(async move {
+        let mut child = Command::new("pkexec")
+            .args(&["pacman", "-S", "--noconfirm", &pkg_clone])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Failed to start install process");
+
+        let window_clone = window.clone();
+        if let Some(stdout) = child.stdout.take() {
+            tokio::spawn(async move {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let _ = window_clone.emit("install-log", line);
+                    }
+                }
+            });
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let window_clone = window.clone();
+            tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut buffer = Vec::new();
+                let mut temp = [0u8; 1024];
+                
+                loop {
+                    match reader.read(&mut temp) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            for &byte in &temp[..n] {
+                                if byte == b'\n' || byte == b'\r' {
+                                    if !buffer.is_empty() {
+                                        if let Ok(line) = String::from_utf8(buffer.clone()) {
+                                            let trimmed = line.trim();
+                                            if !trimmed.is_empty() {
+                                                let _ = window_clone.emit("install-log", trimmed.to_string());
+                                            }
+                                        }
+                                        buffer.clear();
+                                    }
+                                } else {
+                                    buffer.push(byte);
+                                }
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
+        }
+
+        let status = child.wait().expect("Failed to wait for child");
+        let _ = window.emit("install-complete", status.success());
+    });
+
+    Ok(CommandResult {
+        success: true,
+        message: format!("Installation of {} started", pkg),
+        data: None,
+    })
+}
+
+#[tauri::command]
+async fn remove_package(window: Window, pkg: String) -> Result<CommandResult, String> {
+    let pkg_clone = pkg.clone();
+    tokio::spawn(async move {
+        let mut child = Command::new("pkexec")
+            .args(&["pacman", "-Rs", "--noconfirm", &pkg_clone])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Failed to start remove process");
+
+        let window_clone = window.clone();
+        if let Some(stdout) = child.stdout.take() {
+            tokio::spawn(async move {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let _ = window_clone.emit("remove-log", line);
+                    }
+                }
+            });
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let window_clone = window.clone();
+            tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut buffer = Vec::new();
+                let mut temp = [0u8; 1024];
+                
+                loop {
+                    match reader.read(&mut temp) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            for &byte in &temp[..n] {
+                                if byte == b'\n' || byte == b'\r' {
+                                    if !buffer.is_empty() {
+                                        if let Ok(line) = String::from_utf8(buffer.clone()) {
+                                            let trimmed = line.trim();
+                                            if !trimmed.is_empty() {
+                                                let _ = window_clone.emit("remove-log", trimmed.to_string());
+                                            }
+                                        }
+                                        buffer.clear();
+                                    }
+                                } else {
+                                    buffer.push(byte);
+                                }
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
+        }
+
+        let status = child.wait().expect("Failed to wait for child");
+        let _ = window.emit("remove-complete", status.success());
+    });
+
+    Ok(CommandResult {
+        success: true,
+        message: format!("Removal of {} started", pkg),
+        data: None,
+    })
+}
+
+#[tauri::command]
+async fn update_system(window: Window) -> Result<CommandResult, String> {
+    tokio::spawn(async move {
+        let mut child = Command::new("pkexec")
+            .args(&["pacman", "-Syu", "--noconfirm"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Failed to start update process");
+
+        let window_clone = window.clone();
+        if let Some(stdout) = child.stdout.take() {
+            tokio::spawn(async move {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let _ = window_clone.emit("update-log", line);
+                    }
+                }
+            });
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let window_clone = window.clone();
+            tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut buffer = Vec::new();
+                let mut temp = [0u8; 1024];
+                
+                loop {
+                    match reader.read(&mut temp) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            for &byte in &temp[..n] {
+                                if byte == b'\n' || byte == b'\r' {
+                                    if !buffer.is_empty() {
+                                        if let Ok(line) = String::from_utf8(buffer.clone()) {
+                                            let trimmed = line.trim();
+                                            if !trimmed.is_empty() {
+                                                let _ = window_clone.emit("update-log", trimmed.to_string());
+                                            }
+                                        }
+                                        buffer.clear();
+                                    }
+                                } else {
+                                    buffer.push(byte);
+                                }
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
+        }
+
+        let status = child.wait().expect("Failed to wait for child");
+        let _ = window.emit("update-complete", status.success());
+    });
+
+    Ok(CommandResult {
+        success: true,
+        message: "System update started".to_string(),
+        data: None,
+    })
+}
+
+#[tauri::command]
+async fn list_orphans() -> Result<Vec<String>, String> {
+    let output = Command::new("pacman")
+        .args(&["-Qdtq"])
+        .output()
+        .map_err(|e| format!("Failed to execute pacman: {}", e))?;
+
+    if !output.status.success() && output.stdout.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.lines()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.to_string())
+        .collect())
+}
+
+#[tauri::command]
+async fn get_package_history() -> Result<Vec<PackageInfo>, String> {
+    let output = Command::new("tail")
+        .args(&["-n", "500", "/var/log/pacman.log"])
+        .output()
+        .map_err(|e| format!("Failed to read pacman log: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut history = Vec::new();
+
+    for line in stdout.lines() {
+        if line.contains("installed") || line.contains("removed") || line.contains("upgraded") {
+            let parts: Vec<&str> = line.split(']').collect();
+            if parts.len() < 2 {
+                continue;
+            }
+
+            let timestamp = parts[0].trim_start_matches('[').trim();
+            let rest = parts[1].trim();
+
+            if rest.starts_with("[ALPM] installed") {
+                if let Some(pkg_info) = rest.strip_prefix("[ALPM] installed ") {
+                    let pkg_parts: Vec<&str> = pkg_info.split_whitespace().collect();
+                    if let Some(name) = pkg_parts.get(0) {
+                        let version = pkg_parts.get(1).unwrap_or(&"").trim_matches('(').trim_matches(')');
+                        history.push(PackageInfo {
+                            name: name.to_string(),
+                            version: version.to_string(),
+                            repo: "history".to_string(),
+                            description: format!("Installed on {}", timestamp),
+                            installed: false,
+                        });
+                    }
+                }
+            } else if rest.starts_with("[ALPM] removed") {
+                if let Some(pkg_info) = rest.strip_prefix("[ALPM] removed ") {
+                    let pkg_parts: Vec<&str> = pkg_info.split_whitespace().collect();
+                    if let Some(name) = pkg_parts.get(0) {
+                        let version = pkg_parts.get(1).unwrap_or(&"").trim_matches('(').trim_matches(')');
+                        history.push(PackageInfo {
+                            name: name.to_string(),
+                            version: version.to_string(),
+                            repo: "history".to_string(),
+                            description: format!("Removed on {}", timestamp),
+                            installed: false,
+                        });
+                    }
+                }
+            } else if rest.starts_with("[ALPM] upgraded") {
+                if let Some(pkg_info) = rest.strip_prefix("[ALPM] upgraded ") {
+                    let pkg_parts: Vec<&str> = pkg_info.split_whitespace().collect();
+                    if let Some(name) = pkg_parts.get(0) {
+                        let old_ver = pkg_parts.get(1).unwrap_or(&"").trim_matches('(').trim_matches(')');
+                        let new_ver = pkg_parts.get(3).unwrap_or(&"").trim_matches('(').trim_matches(')');
+                        history.push(PackageInfo {
+                            name: name.to_string(),
+                            version: new_ver.to_string(),
+                            repo: "history".to_string(),
+                            description: format!("Upgraded on {} ({} → {})", timestamp, old_ver, new_ver),
+                            installed: false,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    history.reverse();
+    history.truncate(100);
+    Ok(history)
+}
+
+#[tauri::command]
+async fn check_updates() -> Result<Vec<PackageInfo>, String> {
+    let output = Command::new("pacman")
+        .args(&["-Qu"])
+        .output()
+        .map_err(|e| format!("Failed to check updates: {}", e))?;
+
+    if !output.status.success() && output.stdout.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut packages = Vec::new();
+
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 4 {
+            let pkg_name = parts[0].to_string();
+            let current_version = parts[1].to_string();
+            let new_version = parts[3].to_string();
+            
+            let repo_output = Command::new("pacman")
+                .args(&["-Si", &pkg_name])
+                .output()
+                .ok();
+            
+            let mut repo = String::from("unknown");
+            if let Some(info) = repo_output {
+                let info_str = String::from_utf8_lossy(&info.stdout);
+                for info_line in info_str.lines() {
+                    if info_line.starts_with("Repository") {
+                        repo = info_line.split(':')
+                            .nth(1)
+                            .unwrap_or("unknown")
+                            .trim()
+                            .to_string();
+                        break;
+                    }
+                }
+            }
+            
+            packages.push(PackageInfo {
+                name: pkg_name,
+                version: new_version.clone(),
+                repo,
+                description: format!("Installed: {} → Update: {}", current_version, new_version),
+                installed: true,
+            });
+        }
+    }
+
+    Ok(packages)
+}
+
+#[tauri::command]
+async fn clean_cache(window: Window) -> Result<CommandResult, String> {
+    tokio::spawn(async move {
+        let mut child = Command::new("pkexec")
+            .args(&["pacman", "-Sc", "--noconfirm"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Failed to start cache clean process");
+
+        let window_clone = window.clone();
+        if let Some(stdout) = child.stdout.take() {
+            tokio::spawn(async move {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let _ = window_clone.emit("cache-clean-log", line);
+                    }
+                }
+            });
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let window_clone = window.clone();
+            tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut buffer = Vec::new();
+                let mut temp = [0u8; 1024];
+                
+                loop {
+                    match reader.read(&mut temp) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            for &byte in &temp[..n] {
+                                if byte == b'\n' || byte == b'\r' {
+                                    if !buffer.is_empty() {
+                                        if let Ok(line) = String::from_utf8(buffer.clone()) {
+                                            let trimmed = line.trim();
+                                            if !trimmed.is_empty() {
+                                                let _ = window_clone.emit("cache-clean-log", trimmed.to_string());
+                                            }
+                                        }
+                                        buffer.clear();
+                                    }
+                                } else {
+                                    buffer.push(byte);
+                                }
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
+        }
+
+        let status = child.wait().expect("Failed to wait for child");
+        let _ = window.emit("cache-clean-complete", status.success());
+    });
+
+    Ok(CommandResult {
+        success: true,
+        message: "Cache cleaning started".to_string(),
+        data: None,
+    })
+}
+
+#[tauri::command]
+async fn get_package_info(pkg: String, repo: Option<String>, is_installed: Option<bool>) -> Result<serde_json::Value, String> {
+    let repo = repo.unwrap_or_else(|| "unknown".to_string());
+    let is_installed = is_installed.unwrap_or(false);
+    
+    // Optimize command selection based on repo and install status
+    let output = if is_installed {
+        // Installed packages: go straight to pacman -Qi
+        Command::new("pacman")
+            .args(&["-Qi", &pkg])
+            .output()
+            .map_err(|e| format!("Failed to get package info: {}", e))?
+    } else if repo == "aur" {
+        // AUR packages: go straight to yay -Si
+        Command::new("yay")
+            .args(&["-Si", &pkg])
+            .output()
+            .map_err(|e| format!("Failed to get AUR package info: {}", e))?
+    } else {
+        // Official repos: use pacman -Si
+        Command::new("pacman")
+            .args(&["-Si", &pkg])
+            .output()
+            .map_err(|e| format!("Failed to get package info: {}", e))?
+    };
+
+    if !output.status.success() || output.stdout.is_empty() {
+        return Err(format!("No info found for package: {}", pkg));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    
+    let mut info = serde_json::Map::new();
+    
+    for line in stdout.lines() {
+        if let Some(pos) = line.find(':') {
+            let key = line[..pos].trim().to_lowercase().replace(' ', "_");
+            let value = line[pos + 1..].trim().to_string();
+            info.insert(key, serde_json::Value::String(value));
+        }
+    }
+
+    Ok(serde_json::Value::Object(info))
+}
+
+#[tauri::command]
+async fn export_package_list() -> Result<Vec<String>, String> {
+    let output = Command::new("pacman")
+        .args(&["-Qqe"])
+        .output()
+        .map_err(|e| format!("Failed to get package list: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.lines().map(|s| s.to_string()).collect())
+}
+
+#[tauri::command]
+async fn get_cache_size() -> Result<String, String> {
+    let output = Command::new("du")
+        .args(&["-sh", "/var/cache/pacman/pkg"])
+        .output()
+        .map_err(|e| format!("Failed to get cache size: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let size = stdout.split_whitespace().next().unwrap_or("0").to_string();
+    Ok(size)
+}
+
+#[tauri::command]
+async fn install_polkit_policy() -> Result<CommandResult, String> {
+    let policy_content = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+
+  <action id="com.guiman.pacman">
+    <description>Run pacman package manager</description>
+    <message>Authentication is required to manage packages</message>
+    <icon_name>package-x-generic</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/pacman</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+</policyconfig>
+"#;
+
+    let temp_file = "/tmp/com.guiman.pkexec.policy";
+    std::fs::write(temp_file, policy_content)
+        .map_err(|e| format!("Failed to write policy file: {}", e))?;
+
+    let output = Command::new("pkexec")
+        .args(&["cp", temp_file, "/usr/share/polkit-1/actions/com.guiman.pkexec.policy"])
+        .output()
+        .map_err(|e| format!("Failed to install policy: {}", e))?;
+
+    std::fs::remove_file(temp_file).ok();
+
+    if output.status.success() {
+        Ok(CommandResult {
+            success: true,
+            message: "Polkit policy installed successfully! Password prompts disabled.".to_string(),
+            data: None,
+        })
+    } else {
+        Err("Failed to install polkit policy. Make sure you entered the correct password.".to_string())
+    }
+}
+
+#[tauri::command]
+async fn check_polkit_policy() -> Result<bool, String> {
+    Ok(std::path::Path::new("/usr/share/polkit-1/actions/com.guiman.pkexec.policy").exists())
+}
+
+#[tauri::command]
+async fn get_popular_packages() -> Result<Vec<PackageInfo>, String> {
+    use rand::seq::SliceRandom;
+    use rand::thread_rng;
+
+    let popular_packages = vec![
+        "firefox", "chromium", "brave-bin", "git", "vim", "neovim", "code", "docker", "python",
+        "rust", "nodejs", "npm", "yarn", "nginx", "apache", "redis", "postgresql", "mysql",
+        "mariadb", "mongodb", "vlc", "mpv", "gimp", "inkscape", "blender", "libreoffice-fresh",
+        "steam", "discord", "telegram-desktop", "spotify", "obs-studio", "kdenlive", "audacity",
+        "htop", "neofetch", "btop", "tmux", "zsh", "fish", "alacritty", "kitty", "gnome-terminal",
+        "konsole", "dolphin", "nautilus", "thunar", "ranger", "nnn", "mc", "wget", "curl",
+        "openssh", "rsync", "rclone", "zip", "unzip", "p7zip", "tar", "gzip", "bzip2", "xz",
+        "gcc", "clang", "make", "cmake", "meson", "ninja", "gdb", "valgrind", "lldb", "go",
+        "kotlin", "java-runtime-common", "jdk-openjdk", "ruby", "php", "perl", "lua", "r",
+        "julia", "octave", "texlive-core", "pandoc", "hugo", "jekyll", "nginx-mainline",
+        "bind", "dnsmasq", "wireguard-tools", "openvpn", "nmap", "wireshark-qt", "tcpdump",
+        "ettercap", "metasploit", "john", "hashcat", "aircrack-ng", "hydra", "sqlmap",
+        "firefox-developer-edition", "thunderbird", "evolution", "geary", "mutt", "neomutt",
+        "gnome-shell", "plasma-desktop", "xfce4", "i3-wm", "sway", "hyprland", "bspwm", "awesome",
+        "polybar", "waybar", "rofi", "dmenu", "dunst", "mako", "picom", "nitrogen", "feh",
+        "sddm", "lightdm", "gdm", "xorg-server", "wayland", "mesa", "vulkan-radeon", "nvidia",
+        "intel-media-driver", "xf86-video-amdgpu", "cups", "sane", "hplip", "bluez", "pipewire",
+        "pulseaudio", "alsa-utils", "pavucontrol", "easyeffects", "gparted", "timeshift",
+        "grub", "systemd-boot", "refind", "linux", "linux-zen", "linux-lts", "linux-hardened",
+        "base-devel", "multilib-devel", "networkmanager", "iwd", "dhcpcd", "netctl", "bind",
+        "transmission-gtk", "qbittorrent", "deluge", "aria2", "filezilla", "remmina", "virt-manager",
+        "virtualbox", "qemu", "wine", "proton", "lutris", "gamemode", "mangohud", "goverlay",
+        "ansible", "terraform", "kubectl", "helm", "minikube", "docker-compose", "podman",
+        "k9s", "lazydocker", "vagrant", "packer", "awscli", "gcloud-cli", "azure-cli",
+        "bitwarden", "keepassxc", "pass", "gnupg", "openssl", "age", "sops", "vault"
+    ];
+
+    let mut rng = thread_rng();
+    let mut shuffled = popular_packages.clone();
+    shuffled.shuffle(&mut rng);
+    
+    let selected: Vec<&str> = shuffled.iter().take(20).copied().collect();
+    
+    let mut result = Vec::new();
+
+    for pkg_name in selected {
+        let output = Command::new("pacman")
+            .args(&["-Ss", &format!("^{}$", pkg_name)])
+            .output()
+            .ok();
+
+        if let Some(search_result) = output {
+            let stdout = String::from_utf8_lossy(&search_result.stdout);
+            let lines: Vec<&str> = stdout.lines().collect();
+            
+            if lines.len() >= 2 {
+                let first_line = lines[0];
+                if first_line.contains('/') {
+                    let parts: Vec<&str> = first_line.split_whitespace().collect();
+                    if parts.len() >= 2 {
+                        let name_parts: Vec<&str> = parts[0].split('/').collect();
+                        let repo = name_parts.get(0).unwrap_or(&"unknown").to_string();
+                        let name = name_parts.get(1).unwrap_or(&parts[0]).to_string();
+                        let version = parts[1].to_string();
+                        let description = lines[1].trim().to_string();
+                        let installed = first_line.contains("[installed]");
+                        
+                        result.push(PackageInfo {
+                            name,
+                            version,
+                            repo,
+                            description,
+                            installed,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn list_aur_packages(helper: String) -> Result<Vec<PackageInfo>, String> {
+    let helper_cmd = match helper.as_str() {
+        "yay" => "yay",
+        "paru" => "paru",
+        _ => return Err("Invalid AUR helper".to_string()),
+    };
+
+    let check_helper = Command::new("which")
+        .arg(helper_cmd)
+        .output()
+        .ok();
+
+    if check_helper.is_none() || !check_helper.unwrap().status.success() {
+        return Err(format!("{} is not installed. Please install it first.", helper_cmd));
+    }
+
+    let output = Command::new(helper_cmd)
+        .args(&["-Sl", "aur"])
+        .output()
+        .map_err(|e| format!("Failed to list AUR packages: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut packages = Vec::new();
+
+    for line in stdout.lines().take(50) {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 3 {
+            let name = parts[1];
+            let version = parts[2];
+            let installed = line.contains("[installed]");
+
+            packages.push(PackageInfo {
+                name: name.to_string(),
+                version: version.to_string(),
+                repo: "aur".to_string(),
+                description: String::new(),
+                installed,
+            });
+        }
+    }
+
+    Ok(packages)
+}
+
+fn main() {
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            search_package,
+            install_package,
+            remove_package,
+            update_system,
+            list_installed,
+            list_orphans,
+            get_package_history,
+            check_updates,
+            clean_cache,
+            get_package_info,
+            export_package_list,
+            get_cache_size,
+            install_polkit_policy,
+            check_polkit_policy,
+            get_popular_packages,
+            list_aur_packages
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

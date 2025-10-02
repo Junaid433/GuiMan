@@ -1,5 +1,5 @@
 const DEFAULT_CONFIG = {
-  theme: 'dark',
+  theme: 'light',
   autoRefresh: false,
   refreshInterval: 300,
   confirmActions: true,
