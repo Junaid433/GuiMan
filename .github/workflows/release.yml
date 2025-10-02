@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libwebkit2gtk-4.0-dev \
+          libgtk-3-dev \
+          libayatana-appindicator3-dev \
+          librsvg2-dev \
+          patchelf
+          
+    - name: Install npm dependencies
+      run: npm install
+      
+    - name: Build application
+      run: npm run tauri build
+      
+    - name: Create AppImage
+      run: |
+        # Download AppImageTool
+        wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+        
+        # Create AppDir structure
+        mkdir -p GuiMan.AppDir/usr/bin
+        mkdir -p GuiMan.AppDir/usr/share/applications
+        mkdir -p GuiMan.AppDir/usr/share/icons/hicolor/256x256/apps
+        
+        # Copy files
+        cp src-tauri/target/release/guiman GuiMan.AppDir/usr/bin/
+        cp src-tauri/target/release/bundle/deb/guiman/usr/share/applications/guiman.desktop GuiMan.AppDir/
+        cp src-tauri/icons/icon.png GuiMan.AppDir/guiman.png
+        cp src-tauri/icons/icon.png GuiMan.AppDir/usr/share/icons/hicolor/256x256/apps/guiman.png
+        
+        # Create AppRun
+        cat > GuiMan.AppDir/AppRun << 'EOF'
+        #!/bin/bash
+        SELF=$(readlink -f "$0")
+        HERE=${SELF%/*}
+        export PATH="${HERE}/usr/bin/:${PATH}"
+        exec "${HERE}/usr/bin/guiman" "$@"
+        EOF
+        chmod +x GuiMan.AppDir/AppRun
+        
+        # Build AppImage
+        ./appimagetool-x86_64.AppImage GuiMan.AppDir GuiMan-x86_64.AppImage
+        
+    - name: Get version
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          src-tauri/target/release/bundle/deb/guiman_${{ steps.version.outputs.VERSION }}_amd64.deb
+          src-tauri/target/release/bundle/rpm/guiman-${{ steps.version.outputs.VERSION }}-1.x86_64.rpm
+          src-tauri/target/release/bundle/appimage/guiman_${{ steps.version.outputs.VERSION }}_amd64.AppImage
+          GuiMan-x86_64.AppImage
+          src-tauri/target/release/guiman
+        body: |
+          ## GuiMan v${{ steps.version.outputs.VERSION }}
+          
+          ### Installation Methods:
+          
+          **Arch Linux (AUR):**
+          ```bash
+          yay -S guiman
+          # or
+          paru -S guiman
+          ```
+          
+          **AppImage (Universal):**
+          ```bash
+          wget https://github.com/Junaid433/guiman/releases/download/v${{ steps.version.outputs.VERSION }}/GuiMan-x86_64.AppImage
+          chmod +x GuiMan-x86_64.AppImage
+          ./GuiMan-x86_64.AppImage
+          ```
+          
+          **Debian/Ubuntu:**
+          ```bash
+          wget https://github.com/Junaid433/guiman/releases/download/v${{ steps.version.outputs.VERSION }}/guiman_${{ steps.version.outputs.VERSION }}_amd64.deb
+          sudo dpkg -i guiman_${{ steps.version.outputs.VERSION }}_amd64.deb
+          ```
+          
+          **RPM (Fedora/RHEL):**
+          ```bash
+          wget https://github.com/Junaid433/guiman/releases/download/v${{ steps.version.outputs.VERSION }}/guiman-${{ steps.version.outputs.VERSION }}-1.x86_64.rpm
+          sudo rpm -i guiman-${{ steps.version.outputs.VERSION }}-1.x86_64.rpm
+          ```
+          
+          ### What's New:
+          - See CHANGELOG.md for detailed changes
+          
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

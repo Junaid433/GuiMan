@@ -12,7 +12,8 @@
       
       <div class="flex-1 flex flex-col overflow-hidden">
         <SearchBar 
-          v-model="searchQuery" 
+          v-model="searchQuery"
+          :active-view="activeView"
           @search="handleSearch"
           @update-system="handleUpdateSystem"
         />
@@ -22,12 +23,14 @@
             :packages="displayPackages"
             :loading="loading"
             :selected-packages="selectedPackages"
+            :active-view="activeView"
             :compact-view="config.compactView"
             :show-descriptions="config.showDescriptions"
             @toggle-select="toggleSelect"
             @install="handleInstallWithConfirm"
             @remove="handleRemoveWithConfirm"
             @show-details="showPackageDetails"
+            @search-example="handleSearchExample"
           />
         </div>
         
@@ -66,14 +69,27 @@
         @cancel="showConfirmDialog = false"
       />
 
-      <PackageDetailsModal
-        v-if="showDetailsModal"
-        :package-info="selectedPackageForDetails"
-        :details="packageDetails"
-        @close="showDetailsModal = false"
-        @install="handleInstallWithConfirm"
-        @remove="handleRemoveWithConfirm"
-      />
+    <PackageDetailsModal 
+      v-if="showDetailsModal"
+      :package-info="selectedPackageForDetails"
+      :details="packageDetails"
+      @close="showDetailsModal = false"
+      @install="handleInstallWithConfirm"
+      @remove="handleRemoveWithConfirm"
+      @show-dependencies="showDependencyGraph"
+    />
+    
+    <DependencyGraph
+      v-if="showDependencyGraphModal"
+      :package-name="dependencyGraphPackage"
+      @close="showDependencyGraphModal = false"
+      @package-click="handleDependencyPackageClick"
+    />
+    
+    <BackupModal
+      v-if="showBackupModal"
+      @close="showBackupModal = false"
+    />
     </div>
   </div>
 </template>
@@ -92,6 +108,8 @@ import LogModal from './components/LogModal.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import PackageDetailsModal from './components/PackageDetailsModal.vue'
+import DependencyGraph from './components/DependencyGraph.vue'
+import BackupModal from './components/BackupModal.vue'
 import configManager from './utils/config.js'
 
 export default {
@@ -104,7 +122,9 @@ export default {
     LogModal,
     SettingsModal,
     ConfirmDialog,
-    PackageDetailsModal
+    PackageDetailsModal,
+    DependencyGraph,
+    BackupModal
   },
   setup() {
     const activeView = ref('installed')
@@ -127,6 +147,9 @@ export default {
     const showDetailsModal = ref(false)
     const selectedPackageForDetails = ref(null)
     const packageDetails = ref({})
+    const showDependencyGraphModal = ref(false)
+    const dependencyGraphPackage = ref('')
+    const showBackupModal = ref(false)
     let refreshInterval = null
 
     const displayPackages = computed(() => {
@@ -209,6 +232,51 @@ export default {
       
       showDetailsModal.value = true
       
+      // Handle special views
+      if (pkg.repo === 'group') {
+        try {
+          const groupPackages = await invoke('get_group_packages', { group: pkg.name })
+          packageDetails.value = {
+            size: `${pkg.groupData.installed_count} of ${pkg.groupData.total_count} packages installed`,
+            url: '',
+            licenses: [],
+            dependencies: groupPackages.map(p => p.name),
+            optionalDeps: []
+          }
+        } catch (error) {
+          console.error('Failed to get group info:', error)
+        }
+        return
+      }
+      
+      if (pkg.repo === 'repository') {
+        packageDetails.value = {
+          size: `${pkg.repoData.package_count} packages`,
+          url: pkg.repoData.servers.join(', '),
+          licenses: [],
+          dependencies: [],
+          optionalDeps: []
+        }
+        return
+      }
+      
+      if (pkg.repo === 'file' || pkg.repo === 'file-owner') {
+        try {
+          const files = await invoke('list_package_files', { package: pkg.name })
+          packageDetails.value = {
+            size: `${files.length} files`,
+            url: '',
+            licenses: [],
+            dependencies: files.slice(0, 50).map(f => f.path),
+            optionalDeps: []
+          }
+        } catch (error) {
+          console.error('Failed to get file info:', error)
+        }
+        return
+      }
+      
+      // Regular package info
       try {
         const info = await invoke('get_package_info', { 
           pkg: pkg.name,
@@ -256,6 +324,12 @@ export default {
     const handleViewChange = async (view) => {
       activeView.value = view
       selectedPackages.value = []
+      
+      if (view === 'backup') {
+        showBackupModal.value = true
+        return
+      }
+      
       loading.value = true
 
       try {
@@ -285,6 +359,40 @@ export default {
           case 'history':
             packages.value = await invoke('get_package_history')
             break
+          case 'groups':
+            // For groups, we'll show a special view
+            try {
+              const groups = await invoke('list_groups')
+              console.log('Groups received:', groups)
+              packages.value = groups.map(g => ({
+                name: g.name,
+                version: `${g.installed_count}/${g.total_count} installed`,
+                repo: 'group',
+                description: `Package group with ${g.total_count} packages`,
+                installed: g.installed_count > 0,
+                groupData: g
+              }))
+            } catch (error) {
+              console.error('Failed to load groups:', error)
+              packages.value = []
+            }
+            break
+          case 'files':
+            // Files view will be handled separately with search
+            packages.value = []
+            break
+          case 'repos':
+            // Show repositories
+            const repos = await invoke('list_repositories')
+            packages.value = repos.map(r => ({
+              name: r.name,
+              version: `${r.package_count} packages`,
+              repo: 'repository',
+              description: r.servers.length > 0 ? r.servers[0] : 'No servers',
+              installed: r.enabled,
+              repoData: r
+            }))
+            break
           case 'search':
             if (searchQuery.value.trim()) {
               packages.value = await invoke('search_package', { query: searchQuery.value })
@@ -298,20 +406,56 @@ export default {
       }
     }
 
+    const handleSearchExample = (exampleQuery) => {
+      searchQuery.value = exampleQuery
+      handleSearch()
+    }
+
     const handleSearch = async () => {
       if (!searchQuery.value.trim()) return
       
       loading.value = true
       try {
-        const aurEnabled = config.value.aurSupport === true
-        const aurHelper = config.value.aurHelper || 'yay'
-        
-        packages.value = await invoke('search_package', { 
-          query: searchQuery.value,
-          aurEnabled: aurEnabled,
-          aurHelper: aurHelper
-        })
-        activeView.value = 'search'
+        if (activeView.value === 'files') {
+          // Search for files or find file owner
+          if (searchQuery.value.startsWith('/')) {
+            // Find package that owns this file
+            try {
+              const owner = await invoke('find_file_owner', { filePath: searchQuery.value })
+              packages.value = [{
+                name: owner,
+                version: '',
+                repo: 'file-owner',
+                description: `Owns file: ${searchQuery.value}`,
+                installed: true
+              }]
+            } catch (error) {
+              packages.value = []
+              logs.value = [`File '${searchQuery.value}' is not owned by any package`]
+            }
+          } else {
+            // Search for files matching pattern
+            const files = await invoke('search_files', { pattern: searchQuery.value })
+            packages.value = files.map(f => ({
+              name: f.package,
+              version: f.path,
+              repo: 'file',
+              description: f.is_directory ? 'Directory' : 'File',
+              installed: true
+            }))
+          }
+        } else {
+          // Regular package search
+          const aurEnabled = config.value.aurSupport === true
+          const aurHelper = config.value.aurHelper || 'yay'
+          
+          packages.value = await invoke('search_package', { 
+            query: searchQuery.value,
+            aurEnabled: aurEnabled,
+            aurHelper: aurHelper
+          })
+          activeView.value = 'search'
+        }
       } catch (error) {
         console.error('Search error:', error)
       } finally {
@@ -451,6 +595,32 @@ export default {
         logs.value.push(`Error: ${error}`)
         operationCompleted.value = true
         operationSuccess.value = false
+      }
+    }
+
+    const showDependencyGraph = (packageName) => {
+      dependencyGraphPackage.value = packageName
+      showDependencyGraphModal.value = true
+    }
+
+    const handleDependencyPackageClick = (packageName) => {
+      // Close dependency graph and show package details
+      showDependencyGraphModal.value = false
+      
+      // Find the package in current packages list or fetch its info
+      const existingPackage = packages.value.find(p => p.name === packageName)
+      if (existingPackage) {
+        showPackageDetails(existingPackage)
+      } else {
+        // Create a minimal package object and fetch details
+        const packageObj = {
+          name: packageName,
+          version: 'Unknown',
+          repo: 'unknown',
+          description: '',
+          installed: false
+        }
+        showPackageDetails(packageObj)
       }
     }
 
@@ -616,10 +786,14 @@ export default {
       showDetailsModal,
       selectedPackageForDetails,
       packageDetails,
+      showDependencyGraphModal,
+      dependencyGraphPackage,
+      showBackupModal,
       toggleTheme,
       saveSettings,
       handleViewChange,
       handleSearch,
+      handleSearchExample,
       toggleSelect,
       handleInstall,
       handleRemove,
@@ -630,6 +804,8 @@ export default {
       handleUpdateSystem,
       handleCleanCache,
       showPackageDetails,
+      showDependencyGraph,
+      handleDependencyPackageClick,
       closeLogModal
     }
   }

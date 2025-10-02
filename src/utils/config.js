@@ -12,6 +12,11 @@ const DEFAULT_CONFIG = {
   language: 'en',
   compactView: false,
   showDescriptions: true,
+  downloadTimeout: 180,
+  checkDiskSpace: true,
+  verifyPackages: true,
+  colorOutput: true,
+  verboseOutput: false,
 }
 
 export class ConfigManager {

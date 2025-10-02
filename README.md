@@ -1,270 +1,137 @@
 # GuiMan - Arch Linux Package Manager
 
-A modern, beautiful desktop GUI application for managing Arch Linux packages built with **Tauri** (Rust backend) and **Vue.js** (frontend).
+<div align="center">
 
-![GuiMan](https://img.shields.io/badge/Arch-Linux-blue?logo=arch-linux)
-![Tauri](https://img.shields.io/badge/Tauri-1.5-blue)
-![Vue.js](https://img.shields.io/badge/Vue.js-3-green)
+![GuiMan Logo](src-tauri/icons/icon.png)
 
-## Features
+**Modern GUI package manager with full pacman & AUR support**
 
-### Core Functionality
-- **Search Packages**: Search through pacman repositories in real-time
-- **Install/Remove Packages**: Manage packages with a single click or batch operations
-- **System Updates**: Update all packages with live progress tracking
-- **Installed Packages**: View all installed packages
-- **Updates Available**: Check for package updates
-- **Orphan Detection**: Find and remove orphaned packages
-- **Transaction History**: View recent package operations from pacman logs
-- **Package Details**: Click any package name to view detailed information
-- **Cache Management**: Clean package cache with one click
+[![AUR](https://img.shields.io/aur/version/guiman?style=for-the-badge&logo=arch-linux&color=1793d1)](https://aur.archlinux.org/packages/guiman)
+[![GitHub](https://img.shields.io/github/v/release/Junaid433/guiman?style=for-the-badge&logo=github)](https://github.com/Junaid433/guiman/releases)
+[![License](https://img.shields.io/github/license/Junaid433/guiman?style=for-the-badge)](LICENSE)
 
-### Settings & Configuration
-- **Persistent Configuration**: All settings saved automatically
-- **Window State Memory**: Remembers window size and position between sessions
-- **Confirmation Dialogs**: Optional confirmation before install/remove
-- **Auto-Refresh**: Automatically refresh package list at configurable intervals
-- **Check Updates on Startup**: Option to check for updates when app starts
-- **Compact View**: Toggle between normal and compact display modes
-- **Show/Hide Descriptions**: Control package description visibility
-- **AUR Support** (Experimental): Toggle AUR helper integration (yay/paru)
-- **Max Concurrent Downloads**: Configure download parallelism
+![Tauri](https://img.shields.io/badge/Tauri-1.5-blue?style=flat-square)
+![Vue.js](https://img.shields.io/badge/Vue.js-3-green?style=flat-square)
+![Rust](https://img.shields.io/badge/Rust-1.70+-orange?style=flat-square)
 
-### UI/UX Features
-- **Modern Dark/Light Theme**: Toggle between themes with persistent preference
-- **Live Log Streaming**: Watch installation/removal progress in real-time
-- **Multi-Select**: Select multiple packages for batch operations
-- **Responsive Design**: Clean, minimal interface with Tailwind CSS
-- **Status Indicators**: Visual feedback for package states
-- **Color-Coded Repositories**: Easy identification of package sources
-- **Interactive Package Names**: Click to view detailed package information
-- **Smart Confirmations**: Optional safety confirmations for critical operations
-
-## Architecture
-
-### Backend (Rust + Tauri)
-
-**Tauri Commands:**
-- `search_package(query: String)` - Search pacman repositories
-- `install_package(pkg: String)` - Install package with live streaming
-- `remove_package(pkg: String)` - Remove package with live streaming
-- `update_system()` - Update all packages
-- `list_installed()` - List all installed packages
-- `list_orphans()` - List orphaned packages
-- `get_package_history()` - Get transaction history
-- `check_updates()` - Check for available updates
-- `clean_cache()` - Clean package cache
-- `get_package_info(pkg: String)` - Get detailed package information
-- `export_package_list()` - Export list of installed packages
-- `get_cache_size()` - Get current cache size
-
-**Key Technologies:**
-- Tauri for native app wrapper
-- tokio for async runtime
-- pkexec for privilege escalation
-- Process streaming for live logs
-
-### Frontend (Vue 3)
-
-**Component Structure:**
-- `App.vue` - Main application component with state management
-- `Sidebar.vue` - Navigation menu with settings access
-- `SearchBar.vue` - Search and system update actions
-- `PackageTable.vue` - Package listing with actions and details
-- `StatusBar.vue` - Selection status and batch actions
-- `LogModal.vue` - Live log viewer with auto-scroll
-- `SettingsModal.vue` - Comprehensive settings panel
-- `ConfirmDialog.vue` - Safety confirmation dialogs
-- `PackageDetailsModal.vue` - Detailed package information viewer
-
-**State Management:**
-- ConfigManager utility for persistent settings
-- Reactive refs for package data and UI state
-- Event listeners for Rust backend events
-- LocalStorage for configuration persistence
-- Auto-refresh with configurable intervals
+</div>
 
 ## Installation
 
-### Prerequisites
-
-1. **Arch Linux** (or Arch-based distro)
-2. **Node.js** (v16+) and npm
-3. **Rust** (latest stable)
-4. **Tauri dependencies**:
+### AUR
 ```bash
-sudo pacman -S webkit2gtk base-devel curl wget openssl appmenu-gtk-module gtk3 libappindicator-gtk3 librsvg libvips
+yay -S guiman
+# or
+paru -S guiman
 ```
 
-### Build Instructions
-
-1. **Clone the repository**:
+### AppImage
 ```bash
-cd /run/media/junaid/512\ GiB\ HDD/Programming\ Arena/Rust/guiman
+wget https://github.com/Junaid433/guiman/releases/latest/download/GuiMan-x86_64.AppImage
+chmod +x GuiMan-x86_64.AppImage
+./GuiMan-x86_64.AppImage
 ```
 
-2. **Install frontend dependencies**:
+### Quick install
 ```bash
-npm install
+curl -s https://raw.githubusercontent.com/Junaid433/guiman/master/install.sh | bash
 ```
 
-3. **Run in development mode**:
-```bash
-npm run tauri dev
-```
+## What it does
 
-4. **Build for production**:
-```bash
-npm run tauri build
-```
+GuiMan wraps pacman and your AUR helper (yay/paru) in a clean interface. Everything you can do in the terminal, you can do here—plus some extras that are just easier with a GUI.
 
-The built application will be in `src-tauri/target/release/bundle/`
+**Package management**: Search, install, remove, update. Works with both official repos and AUR. Real-time output streaming so you see exactly what's happening.
+
+**System operations**: One-click system updates, orphan detection, cache cleaning, package group management.
+
+**AUR extras**: Vote on packages, flag out-of-date, adopt orphaned packages. Custom makepkg flags if you need them.
+
+**Power user stuff**: Dependency graphs, mirror management with reflector integration, backup/restore package lists, pacman hooks viewer.
+
+**Password handling**: Optional polkit integration means you authenticate once and you're done. No more typing your password every 5 minutes.
+
+The interface updates in real-time. When you're installing something, you see the actual pacman/makepkg output—no fake progress bars.
 
 ## Usage
 
-### Running the Application
+Launch with `guiman` or find it in your app menu.
 
-Development mode:
+Navigation is straightforward:
+- Home: search and install
+- Installed: what's on your system
+- Updates: what needs updating
+- Orphans: packages nothing depends on
+- Groups: package groups (base-devel, etc.)
+- Files: search by filename or find what owns a file
+- Repositories: manage your repos
+- Dependencies: visual dependency tree
+- History: transaction log
+- Settings: configure everything
+
+**Batch operations**: Select multiple packages and act on all at once.
+
+**Password-free mode**: Settings → System Integration → Install Polkit Policy. Enter your password once, never asked again (for package operations).
+
+## Building from source
+
 ```bash
-npm run tauri dev
+# Dependencies
+sudo pacman -S rust nodejs npm webkit2gtk gtk3 libayatana-appindicator
+
+git clone https://github.com/Junaid433/guiman.git
+cd guiman
+npm install
+
+# Development
+npm run tauri:dev
+
+# Production build
+npm run tauri build
 ```
 
-Production:
-```bash
-./src-tauri/target/release/guiman
-```
+## Architecture
 
-### Permissions & Password Management
-
-The app uses `pkexec` for privilege escalation when installing/removing packages. 
-
-**You have two options:**
-
-1. **With Password Prompts** (Default)
-   - Enter your password for each package operation
-   - More secure if you prefer manual confirmation
-
-2. **Password-Free Mode** (Optional - Install from Settings)
-   - Go to Settings → System Integration → Install Policy
-   - Enter password once, never asked again for your session
-   - Same method used by GNOME Software, KDE Discover, etc.
-
-**Your choice!** Both options are secure. Install the policy if you find password prompts annoying.
-
-### Navigation
-
-- **Installed**: View all installed packages
-- **Available**: Browse available packages (use search)
-- **Updates**: Check for package updates
-- **Orphans**: View orphaned packages
-- **History**: View recent package operations
-
-### Operations
-
-1. **Search**: Type package name and press Enter or click Search
-2. **Install**: Click Install button on any package (confirmation optional)
-3. **Remove**: Click Remove button on installed packages (confirmation optional)
-4. **Batch Operations**: Select multiple packages and use bottom bar actions
-5. **System Update**: Click "Update System" button in top bar
-6. **View Details**: Click on any package name to see detailed information
-7. **Settings**: Access comprehensive settings from sidebar
-8. **Clean Cache**: Remove old package files from settings panel
-9. **Optional**: Install polkit policy from Settings to skip password prompts
-
-### Settings Panel
-
-Access settings by clicking the gear icon in the sidebar:
-
-- **System Integration**: Optional polkit policy for password-free operations
-- **General Settings**: Confirmations, notifications, descriptions
-- **Auto-Refresh**: Configure automatic package list updates
-- **AUR Support**: Enable experimental AUR helper integration
-- **Cache Management**: View and clean package cache
-- **Advanced**: Configure max concurrent downloads
-- **Reset**: Restore all settings to defaults
-
-## Design Decisions
-
-### Why Tauri?
-- Smaller binary size compared to Electron
-- Native performance with Rust
-- Better security model
-- Lower resource usage
-
-### Why Vue.js?
-- Lightweight and fast
-- Simple component model
-- Excellent reactivity system
-- Easy to learn and maintain
-
-### Live Streaming Architecture
-- Used Rust's async tokio runtime for non-blocking operations
-- Event-based communication from Rust to Vue
-- Separate event channels for install/remove/update logs
-- Real-time UI updates via Vue's reactive system
-
-### Security Considerations
-- Uses `pkexec` instead of hardcoded sudo
-- No password storage
-- Commands validated before execution
-- Sandboxed Tauri environment
-
-## Future Enhancements
-
-- ✅ ~~AUR helper integration (yay/paru)~~ (Added - Experimental)
-- ✅ ~~Package dependency visualization~~ (Added in Package Details)
-- ✅ ~~Package information modal with full details~~ (Added)
-- ✅ ~~Export/import package lists~~ (Added)
-- ✅ ~~Scheduled update checks~~ (Added - Auto-refresh)
-- Search filters (by repo, installed status, etc.)
-- Desktop notifications for updates
-- Backup/restore functionality
-- Package file browser
-- Dependency graph visualization
-- Rollback functionality
-- Custom package repositories
-
-## Project Structure
+Rust backend using Tauri handles all system operations. Vue 3 frontend with Tailwind. Direct integration with pacman/yay/paru—no wrapper scripts or compatibility layers. Polkit for privilege escalation. Event-driven communication between frontend and backend for real-time updates.
 
 ```
 guiman/
-├── src/                    # Vue.js frontend
-│   ├── components/         # Vue components
-│   │   ├── Sidebar.vue
-│   │   ├── SearchBar.vue
-│   │   ├── PackageTable.vue
-│   │   ├── StatusBar.vue
-│   │   ├── LogModal.vue
-│   │   ├── SettingsModal.vue
-│   │   ├── ConfirmDialog.vue
-│   │   └── PackageDetailsModal.vue
-│   ├── utils/             # Utility functions
-│   │   └── config.js      # Configuration manager
-│   ├── App.vue            # Main app component
-│   ├── main.js            # Vue entry point
-│   └── style.css          # Global styles
-├── src-tauri/             # Tauri/Rust backend
+├── src/                  # Vue frontend
+│   ├── components/
+│   └── utils/
+├── src-tauri/           # Rust backend
 │   ├── src/
-│   │   └── main.rs        # Rust Tauri commands
-│   ├── Cargo.toml         # Rust dependencies
-│   ├── tauri.conf.json    # Tauri configuration
-│   └── build.rs           # Build script
-├── package.json           # Node dependencies
-├── vite.config.js         # Vite bundler config
-├── tailwind.config.js     # Tailwind CSS config
-├── postcss.config.js      # PostCSS config
-└── setup.sh               # Setup script
+│   │   ├── commands/    # Tauri command handlers
+│   │   ├── pacman/      # Pacman integration
+│   │   └── aur/         # AUR operations
+│   └── Cargo.toml
+└── PKGBUILD             # AUR package
 ```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests.
+Bug reports and PRs welcome. If you're adding a feature, open an issue first so we can discuss approach.
+
+Follow standard Rust and Vue conventions. Test your changes. Update docs if needed.
+
+## Roadmap
+
+Working on desktop notifications and performance improvements. Planning rollback support and flatpak integration down the line. Plugin system is on the list but no ETA.
 
 ## License
 
-MIT License
+MIT - see LICENSE file.
 
 ## Credits
 
-Built with ❤️ for the Arch Linux community
+Built by [Junaid Rahman](https://github.com/Junaid433).
 
+Uses Tauri, Vue.js, Tailwind CSS, and Rust. Thanks to the Arch community for testing and feedback.
+
+---
+
+<div align="center">
+
+[Report Bug](https://github.com/Junaid433/guiman/issues) • [Request Feature](https://github.com/Junaid433/guiman/issues) • [Discussions](https://github.com/Junaid433/guiman/discussions)
+
+</div>

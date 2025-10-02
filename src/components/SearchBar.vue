@@ -7,7 +7,7 @@
           :value="modelValue"
           @input="$emit('update:modelValue', $event.target.value)"
           @keyup.enter="$emit('search')"
-          placeholder="Search packages..."
+          :placeholder="getPlaceholder()"
           class="w-full px-4 py-2 pl-10 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
         />
         <svg class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
@@ -39,9 +39,24 @@
 export default {
   name: 'SearchBar',
   props: {
-    modelValue: String
+    modelValue: String,
+    activeView: String
   },
-  emits: ['update:modelValue', 'search', 'update-system']
+  emits: ['update:modelValue', 'search', 'update-system'],
+  methods: {
+    getPlaceholder() {
+      switch (this.activeView) {
+        case 'files':
+          return 'Search files or find package by file path...'
+        case 'groups':
+          return 'Search package groups...'
+        case 'repos':
+          return 'Search repositories...'
+        default:
+          return 'Search packages...'
+      }
+    }
+  }
 }
 </script>
 
