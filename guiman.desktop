@@ -1,0 +1,18 @@
+[Desktop Entry]
+Name=GuiMan
+Comment=The Ultimate Arch Linux Package Manager
+GenericName=Package Manager
+Exec=guiman
+Icon=guiman
+Type=Application
+Categories=System;PackageManager;
+Keywords=package;manager;pacman;aur;arch;linux;
+StartupNotify=true
+StartupWMClass=guiman
+MimeType=application/x-package;
+Actions=
+
+[Desktop Action Settings]
+Name=Settings
+Exec=guiman --settings
+Icon=preferences-system

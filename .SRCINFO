@@ -1,0 +1,28 @@
+pkgbase = guiman
+	pkgdesc = The Ultimate Arch Linux Package Manager - GUI with 100% pacman & AUR feature parity
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/Junaid433/guiman
+	arch = x86_64
+	license = MIT
+	makedepends = rust
+	makedepends = cargo
+	makedepends = nodejs
+	makedepends = npm
+	makedepends = git
+	depends = webkit2gtk
+	depends = gtk3
+	depends = libayatana-appindicator
+	depends = pacman
+	depends = sudo
+	optdepends = yay: AUR helper support
+	optdepends = paru: AUR helper support
+	optdepends = reflector: Mirror management
+	optdepends = polkit: Password-free operations
+	provides = guiman
+	conflicts = guiman-bin
+	conflicts = guiman-git
+	source = git+https://github.com/Junaid433/guiman.git#tag=v0.1.0
+	sha256sums = SKIP
+
+pkgname = guiman
