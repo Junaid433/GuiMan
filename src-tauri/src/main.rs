@@ -26,49 +26,84 @@ struct CommandResult {
 
 #[tauri::command]
 async fn search_package(query: String) -> Result<Vec<PackageInfo>, String> {
+    use fuzzy_matcher::FuzzyMatcher;
+    use fuzzy_matcher::skim::SkimMatcherV2;
+
     if query.trim().is_empty() {
         return Ok(Vec::new());
     }
 
     let output = Command::new("pacman")
-        .args(&["-Ss", &query])
+        .args(&["-Sl"])
         .output()
         .map_err(|e| format!("Failed to execute pacman: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut packages = Vec::new();
-    let lines: Vec<&str> = stdout.lines().collect();
+    let matcher = SkimMatcherV2::default();
     
-    let mut i = 0;
-    while i < lines.len() {
-        let line = lines[i];
-        if line.contains('/') {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 2 {
-                let name_parts: Vec<&str> = parts[0].split('/').collect();
-                let repo = name_parts.get(0).unwrap_or(&"unknown").to_string();
-                let name = name_parts.get(1).unwrap_or(&parts[0]).to_string();
-                let version = parts[1].to_string();
-                
-                let description = if i + 1 < lines.len() {
-                    lines[i + 1].trim().to_string()
-                } else {
-                    String::new()
-                };
+    let mut scored_packages: Vec<(i64, PackageInfo)> = Vec::new();
 
-                let installed = line.contains("[installed]");
-                
-                packages.push(PackageInfo {
-                    name,
-                    version,
-                    repo,
-                    description,
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 3 {
+            let repo = parts[0];
+            let name = parts[1];
+            let version = parts[2];
+            let installed = line.contains("[installed]");
+
+            let name_score = matcher.fuzzy_match(name, &query);
+            
+            if let Some(score) = name_score {
+                scored_packages.push((score, PackageInfo {
+                    name: name.to_string(),
+                    version: version.to_string(),
+                    repo: repo.to_string(),
+                    description: String::new(),
                     installed,
-                });
+                }));
             }
-            i += 2;
-        } else {
-            i += 1;
+        }
+    }
+
+    scored_packages.sort_by(|a, b| b.0.cmp(&a.0));
+    scored_packages.truncate(50);
+
+    let mut packages: Vec<PackageInfo> = scored_packages.into_iter()
+        .map(|(_, pkg)| pkg)
+        .collect();
+
+    if !packages.is_empty() {
+        let pkg_names: Vec<String> = packages.iter().map(|p| p.name.clone()).collect();
+        let info_output = Command::new("pacman")
+            .args(&["-Si"])
+            .args(&pkg_names)
+            .output()
+            .ok();
+
+        if let Some(info) = info_output {
+            let info_str = String::from_utf8_lossy(&info.stdout);
+            let mut current_name = String::new();
+            let mut current_desc = String::new();
+
+            for line in info_str.lines() {
+                if line.starts_with("Name") {
+                    if !current_name.is_empty() && !current_desc.is_empty() {
+                        if let Some(pkg) = packages.iter_mut().find(|p| p.name == current_name) {
+                            pkg.description = current_desc.clone();
+                        }
+                    }
+                    current_name = line.split(':').nth(1).unwrap_or("").trim().to_string();
+                    current_desc = String::new();
+                } else if line.starts_with("Description") {
+                    current_desc = line.split(':').nth(1).unwrap_or("").trim().to_string();
+                }
+            }
+
+            if !current_name.is_empty() && !current_desc.is_empty() {
+                if let Some(pkg) = packages.iter_mut().find(|p| p.name == current_name) {
+                    pkg.description = current_desc;
+                }
+            }
         }
     }
 
@@ -329,19 +364,87 @@ async fn list_orphans() -> Result<Vec<String>, String> {
         .output()
         .map_err(|e| format!("Failed to execute pacman: {}", e))?;
 
+    if !output.status.success() && output.stdout.is_empty() {
+        return Ok(Vec::new());
+    }
+
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(stdout.lines().map(|s| s.to_string()).collect())
+    Ok(stdout.lines()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.to_string())
+        .collect())
 }
 
 #[tauri::command]
-async fn get_package_history() -> Result<Vec<String>, String> {
+async fn get_package_history() -> Result<Vec<PackageInfo>, String> {
     let output = Command::new("tail")
-        .args(&["-n", "100", "/var/log/pacman.log"])
+        .args(&["-n", "500", "/var/log/pacman.log"])
         .output()
         .map_err(|e| format!("Failed to read pacman log: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(stdout.lines().map(|s| s.to_string()).collect())
+    let mut history = Vec::new();
+
+    for line in stdout.lines() {
+        if line.contains("installed") || line.contains("removed") || line.contains("upgraded") {
+            let parts: Vec<&str> = line.split(']').collect();
+            if parts.len() < 2 {
+                continue;
+            }
+
+            let timestamp = parts[0].trim_start_matches('[').trim();
+            let rest = parts[1].trim();
+
+            if rest.starts_with("[ALPM] installed") {
+                if let Some(pkg_info) = rest.strip_prefix("[ALPM] installed ") {
+                    let pkg_parts: Vec<&str> = pkg_info.split_whitespace().collect();
+                    if let Some(name) = pkg_parts.get(0) {
+                        let version = pkg_parts.get(1).unwrap_or(&"").trim_matches('(').trim_matches(')');
+                        history.push(PackageInfo {
+                            name: name.to_string(),
+                            version: version.to_string(),
+                            repo: "history".to_string(),
+                            description: format!("Installed on {}", timestamp),
+                            installed: false,
+                        });
+                    }
+                }
+            } else if rest.starts_with("[ALPM] removed") {
+                if let Some(pkg_info) = rest.strip_prefix("[ALPM] removed ") {
+                    let pkg_parts: Vec<&str> = pkg_info.split_whitespace().collect();
+                    if let Some(name) = pkg_parts.get(0) {
+                        let version = pkg_parts.get(1).unwrap_or(&"").trim_matches('(').trim_matches(')');
+                        history.push(PackageInfo {
+                            name: name.to_string(),
+                            version: version.to_string(),
+                            repo: "history".to_string(),
+                            description: format!("Removed on {}", timestamp),
+                            installed: false,
+                        });
+                    }
+                }
+            } else if rest.starts_with("[ALPM] upgraded") {
+                if let Some(pkg_info) = rest.strip_prefix("[ALPM] upgraded ") {
+                    let pkg_parts: Vec<&str> = pkg_info.split_whitespace().collect();
+                    if let Some(name) = pkg_parts.get(0) {
+                        let old_ver = pkg_parts.get(1).unwrap_or(&"").trim_matches('(').trim_matches(')');
+                        let new_ver = pkg_parts.get(3).unwrap_or(&"").trim_matches('(').trim_matches(')');
+                        history.push(PackageInfo {
+                            name: name.to_string(),
+                            version: new_ver.to_string(),
+                            repo: "history".to_string(),
+                            description: format!("Upgraded on {} ({} → {})", timestamp, old_ver, new_ver),
+                            installed: false,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    history.reverse();
+    history.truncate(100);
+    Ok(history)
 }
 
 #[tauri::command]

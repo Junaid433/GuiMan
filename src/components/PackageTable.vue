@@ -104,14 +104,14 @@
                   Update
                 </button>
                 <button
-                  v-if="!pkg.installed && pkg.repo !== 'log' && !isUpdatePackage(pkg)"
+                  v-if="!pkg.installed && pkg.repo !== 'log' && pkg.repo !== 'history' && !isUpdatePackage(pkg)"
                   @click="$emit('install', pkg)"
                   class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
                 >
                   Install
                 </button>
                 <button
-                  v-if="pkg.installed && pkg.repo !== 'log' && !isUpdatePackage(pkg)"
+                  v-if="pkg.installed && pkg.repo !== 'log' && pkg.repo !== 'history' && !isUpdatePackage(pkg)"
                   @click="$emit('remove', pkg)"
                   class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded-md transition-colors"
                 >
@@ -167,6 +167,7 @@ export default {
         'multilib': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
         'updates': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
         'orphan': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+        'history': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
         'log': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
       }
       return classes[repo] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'

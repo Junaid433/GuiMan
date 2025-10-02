@@ -263,14 +263,7 @@ export default {
             }))
             break
           case 'history':
-            const history = await invoke('get_package_history')
-            packages.value = history.map(line => ({
-              name: line,
-              version: '',
-              repo: 'log',
-              description: '',
-              installed: false
-            }))
+            packages.value = await invoke('get_package_history')
             break
           case 'search':
             if (searchQuery.value.trim()) {

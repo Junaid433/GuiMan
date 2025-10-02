@@ -13,6 +13,7 @@ tauri = { version = "1.5", features = [ "notification-all", "window-start-draggi
 tokio = { version = "1", features = ["full"] }
 regex = "1.10"
 rand = "0.8"
+fuzzy-matcher = "0.3"
 
 [features]
 custom-protocol = [ "tauri/custom-protocol" ]
