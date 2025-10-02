@@ -22,8 +22,8 @@
           </div>
           <div>
             <label class="text-sm font-semibold text-gray-500 dark:text-gray-400">Status</label>
-            <p :class="packageInfo.installed ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'">
-              {{ packageInfo.installed ? 'Installed' : 'Not Installed' }}
+            <p :class="getStatusClass()">
+              {{ getStatusText() }}
             </p>
           </div>
           <div>
@@ -73,7 +73,10 @@
           Close
         </button>
         <div class="flex gap-3">
-          <button v-if="!packageInfo.installed" @click="$emit('install', packageInfo)" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+          <button v-if="isUpdatePackage()" @click="$emit('install', packageInfo)" class="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors">
+            Update
+          </button>
+          <button v-else-if="!packageInfo.installed" @click="$emit('install', packageInfo)" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
             Install
           </button>
           <button v-else @click="$emit('remove', packageInfo)" class="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
@@ -95,7 +98,24 @@ export default {
       default: () => ({})
     }
   },
-  emits: ['close', 'install', 'remove']
+  emits: ['close', 'install', 'remove'],
+  methods: {
+    isUpdatePackage() {
+      return this.packageInfo.description && this.packageInfo.description.includes('→')
+    },
+    getStatusText() {
+      if (this.isUpdatePackage()) {
+        return 'Update Required'
+      }
+      return this.packageInfo.installed ? 'Installed' : 'Not Installed'
+    },
+    getStatusClass() {
+      if (this.isUpdatePackage()) {
+        return 'text-orange-600 dark:text-orange-400'
+      }
+      return this.packageInfo.installed ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'
+    }
+  }
 }
 </script>
 

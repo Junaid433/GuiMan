@@ -203,12 +203,13 @@ export default {
       
       try {
         const info = await invoke('get_package_info', { pkg: pkg.name })
+        const size = info.installed_size || info.download_size || 'Unknown'
         packageDetails.value = {
-          size: info.installed_size || 'Unknown',
+          size: size,
           url: info.url || '',
-          licenses: info.licenses ? info.licenses.split(' ') : [],
-          dependencies: info.depends_on ? info.depends_on.split(' ') : [],
-          optionalDeps: info.optional_deps ? info.optional_deps.split(' ') : []
+          licenses: info.licenses ? info.licenses.split(' ').filter(l => l.trim()) : [],
+          dependencies: info.depends_on ? info.depends_on.split(' ').filter(d => d.trim()) : [],
+          optionalDeps: info.optional_deps ? info.optional_deps.split(' ').filter(d => d.trim()) : []
         }
       } catch (error) {
         console.error('Failed to get package info:', error)
@@ -245,7 +246,7 @@ export default {
           case 'installed':
             packages.value = await invoke('list_installed')
             break
-          case 'available':
+          case 'popular':
             packages.value = await invoke('get_popular_packages')
             break
           case 'updates':

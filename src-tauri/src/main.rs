@@ -85,13 +85,34 @@ async fn list_installed() -> Result<Vec<PackageInfo>, String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut packages = Vec::new();
     
+    let sync_output = Command::new("pacman")
+        .args(&["-Sl"])
+        .output()
+        .ok();
+    
+    let mut repo_map = std::collections::HashMap::new();
+    if let Some(sync) = sync_output {
+        let sync_str = String::from_utf8_lossy(&sync.stdout);
+        for sync_line in sync_str.lines() {
+            let parts: Vec<&str> = sync_line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                repo_map.insert(parts[1].to_string(), parts[0].to_string());
+            }
+        }
+    }
+    
     for line in stdout.lines() {
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() >= 2 {
+            let pkg_name = parts[0].to_string();
+            let repo = repo_map.get(&pkg_name)
+                .cloned()
+                .unwrap_or_else(|| "local".to_string());
+            
             packages.push(PackageInfo {
-                name: parts[0].to_string(),
+                name: pkg_name,
                 version: parts[1].to_string(),
-                repo: "local".to_string(),
+                repo,
                 description: String::new(),
                 installed: true,
             });
@@ -325,9 +346,14 @@ async fn get_package_history() -> Result<Vec<String>, String> {
 
 #[tauri::command]
 async fn check_updates() -> Result<Vec<PackageInfo>, String> {
-    let output = Command::new("checkupdates")
+    let output = Command::new("pacman")
+        .args(&["-Qu"])
         .output()
         .map_err(|e| format!("Failed to check updates: {}", e))?;
+
+    if !output.status.success() && output.stdout.is_empty() {
+        return Ok(Vec::new());
+    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut packages = Vec::new();
@@ -335,11 +361,35 @@ async fn check_updates() -> Result<Vec<PackageInfo>, String> {
     for line in stdout.lines() {
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() >= 4 {
+            let pkg_name = parts[0].to_string();
+            let current_version = parts[1].to_string();
+            let new_version = parts[3].to_string();
+            
+            let repo_output = Command::new("pacman")
+                .args(&["-Si", &pkg_name])
+                .output()
+                .ok();
+            
+            let mut repo = String::from("unknown");
+            if let Some(info) = repo_output {
+                let info_str = String::from_utf8_lossy(&info.stdout);
+                for info_line in info_str.lines() {
+                    if info_line.starts_with("Repository") {
+                        repo = info_line.split(':')
+                            .nth(1)
+                            .unwrap_or("unknown")
+                            .trim()
+                            .to_string();
+                        break;
+                    }
+                }
+            }
+            
             packages.push(PackageInfo {
-                name: parts[0].to_string(),
-                version: parts[3].to_string(),
-                repo: "updates".to_string(),
-                description: format!("{} -> {}", parts[1], parts[3]),
+                name: pkg_name,
+                version: new_version.clone(),
+                repo,
+                description: format!("Installed: {} → Update: {}", current_version, new_version),
                 installed: true,
             });
         }
@@ -416,10 +466,25 @@ async fn clean_cache(window: Window) -> Result<CommandResult, String> {
 
 #[tauri::command]
 async fn get_package_info(pkg: String) -> Result<serde_json::Value, String> {
-    let output = Command::new("pacman")
+    let installed_output = Command::new("pacman")
         .args(&["-Qi", &pkg])
-        .output()
-        .map_err(|e| format!("Failed to get package info: {}", e))?;
+        .output();
+
+    let output = if let Ok(out) = installed_output {
+        if out.status.success() && !out.stdout.is_empty() {
+            out
+        } else {
+            Command::new("pacman")
+                .args(&["-Si", &pkg])
+                .output()
+                .map_err(|e| format!("Failed to get package info: {}", e))?
+        }
+    } else {
+        Command::new("pacman")
+            .args(&["-Si", &pkg])
+            .output()
+            .map_err(|e| format!("Failed to get package info: {}", e))?
+    };
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     
@@ -512,62 +577,81 @@ async fn check_polkit_policy() -> Result<bool, String> {
 
 #[tauri::command]
 async fn get_popular_packages() -> Result<Vec<PackageInfo>, String> {
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg("pacman -Slq | shuf | head -50")
-        .output()
-        .map_err(|e| format!("Failed to get random packages: {}", e))?;
+    use rand::seq::SliceRandom;
+    use rand::thread_rng;
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let package_names: Vec<&str> = stdout.lines().collect();
+    let popular_packages = vec![
+        "firefox", "chromium", "brave-bin", "git", "vim", "neovim", "code", "docker", "python",
+        "rust", "nodejs", "npm", "yarn", "nginx", "apache", "redis", "postgresql", "mysql",
+        "mariadb", "mongodb", "vlc", "mpv", "gimp", "inkscape", "blender", "libreoffice-fresh",
+        "steam", "discord", "telegram-desktop", "spotify", "obs-studio", "kdenlive", "audacity",
+        "htop", "neofetch", "btop", "tmux", "zsh", "fish", "alacritty", "kitty", "gnome-terminal",
+        "konsole", "dolphin", "nautilus", "thunar", "ranger", "nnn", "mc", "wget", "curl",
+        "openssh", "rsync", "rclone", "zip", "unzip", "p7zip", "tar", "gzip", "bzip2", "xz",
+        "gcc", "clang", "make", "cmake", "meson", "ninja", "gdb", "valgrind", "lldb", "go",
+        "kotlin", "java-runtime-common", "jdk-openjdk", "ruby", "php", "perl", "lua", "r",
+        "julia", "octave", "texlive-core", "pandoc", "hugo", "jekyll", "nginx-mainline",
+        "bind", "dnsmasq", "wireguard-tools", "openvpn", "nmap", "wireshark-qt", "tcpdump",
+        "ettercap", "metasploit", "john", "hashcat", "aircrack-ng", "hydra", "sqlmap",
+        "firefox-developer-edition", "thunderbird", "evolution", "geary", "mutt", "neomutt",
+        "gnome-shell", "plasma-desktop", "xfce4", "i3-wm", "sway", "hyprland", "bspwm", "awesome",
+        "polybar", "waybar", "rofi", "dmenu", "dunst", "mako", "picom", "nitrogen", "feh",
+        "sddm", "lightdm", "gdm", "xorg-server", "wayland", "mesa", "vulkan-radeon", "nvidia",
+        "intel-media-driver", "xf86-video-amdgpu", "cups", "sane", "hplip", "bluez", "pipewire",
+        "pulseaudio", "alsa-utils", "pavucontrol", "easyeffects", "gparted", "timeshift",
+        "grub", "systemd-boot", "refind", "linux", "linux-zen", "linux-lts", "linux-hardened",
+        "base-devel", "multilib-devel", "networkmanager", "iwd", "dhcpcd", "netctl", "bind",
+        "transmission-gtk", "qbittorrent", "deluge", "aria2", "filezilla", "remmina", "virt-manager",
+        "virtualbox", "qemu", "wine", "proton", "lutris", "gamemode", "mangohud", "goverlay",
+        "ansible", "terraform", "kubectl", "helm", "minikube", "docker-compose", "podman",
+        "k9s", "lazydocker", "vagrant", "packer", "awscli", "gcloud-cli", "azure-cli",
+        "bitwarden", "keepassxc", "pass", "gnupg", "openssl", "age", "sops", "vault"
+    ];
 
-    let mut packages = Vec::new();
+    let mut rng = thread_rng();
+    let mut shuffled = popular_packages.clone();
+    shuffled.shuffle(&mut rng);
+    
+    let selected: Vec<&str> = shuffled.iter().take(20).copied().collect();
+    
+    let mut result = Vec::new();
 
-    for pkg_name in package_names {
+    for pkg_name in selected {
         let output = Command::new("pacman")
-            .args(&["-Si", pkg_name])
+            .args(&["-Ss", &format!("^{}$", pkg_name)])
             .output()
             .ok();
 
-        if let Some(info) = output {
-            let info_str = String::from_utf8_lossy(&info.stdout);
+        if let Some(search_result) = output {
+            let stdout = String::from_utf8_lossy(&search_result.stdout);
+            let lines: Vec<&str> = stdout.lines().collect();
             
-            let mut name = pkg_name.to_string();
-            let mut version = String::new();
-            let mut repo = String::new();
-            let mut description = String::new();
-
-            for line in info_str.lines() {
-                if line.starts_with("Repository") {
-                    repo = line.split(':').nth(1).unwrap_or("").trim().to_string();
-                } else if line.starts_with("Version") {
-                    version = line.split(':').nth(1).unwrap_or("").trim().to_string();
-                } else if line.starts_with("Description") {
-                    description = line.split(':').nth(1).unwrap_or("").trim().to_string();
-                } else if line.starts_with("Name") {
-                    name = line.split(':').nth(1).unwrap_or(pkg_name).trim().to_string();
+            if lines.len() >= 2 {
+                let first_line = lines[0];
+                if first_line.contains('/') {
+                    let parts: Vec<&str> = first_line.split_whitespace().collect();
+                    if parts.len() >= 2 {
+                        let name_parts: Vec<&str> = parts[0].split('/').collect();
+                        let repo = name_parts.get(0).unwrap_or(&"unknown").to_string();
+                        let name = name_parts.get(1).unwrap_or(&parts[0]).to_string();
+                        let version = parts[1].to_string();
+                        let description = lines[1].trim().to_string();
+                        let installed = first_line.contains("[installed]");
+                        
+                        result.push(PackageInfo {
+                            name,
+                            version,
+                            repo,
+                            description,
+                            installed,
+                        });
+                    }
                 }
-            }
-
-            let installed_check = Command::new("pacman")
-                .args(&["-Q", &name])
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false);
-
-            if !version.is_empty() {
-                packages.push(PackageInfo {
-                    name,
-                    version,
-                    repo,
-                    description,
-                    installed: installed_check,
-                });
             }
         }
     }
 
-    Ok(packages)
+    Ok(result)
 }
 
 fn main() {
