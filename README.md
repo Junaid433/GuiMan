@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![GuiMan Logo](src-tauri/icons/icon.png)
+<img src="src-tauri/icons/icon.png" alt="GuiMan Logo" width="96">
 
 **Modern GUI package manager with full pacman & AUR support**
 
