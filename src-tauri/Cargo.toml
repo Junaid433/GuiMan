@@ -1,7 +1,15 @@
 [package]
 name = "guiman"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
+authors = ["Junaid Rahman <junaid.cloud2@gmail.com>"]
+description = "The Ultimate Arch Linux Package Manager - GUI with 100% pacman & AUR feature parity"
+license = "MIT"
+repository = "https://github.com/Junaid433/guiman"
+homepage = "https://github.com/Junaid433/guiman"
+readme = "../README.md"
+keywords = ["arch-linux", "aur", "package-manager", "gui", "tauri"]
+categories = ["command-line-utilities", "development-tools", "gui"]
 
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }
@@ -9,7 +17,18 @@ tauri-build = { version = "1.5", features = [] }
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.5", features = [ "notification-all", "window-start-dragging", "window-maximize", "window-unmaximize", "window-show", "window-minimize", "window-close", "window-unminimize", "window-hide", "shell-open"] }
+tauri = { version = "1.5", features = [
+    "notification-all",
+    "window-start-dragging",
+    "window-maximize",
+    "window-unmaximize",
+    "window-show",
+    "window-minimize",
+    "window-close",
+    "window-unminimize",
+    "window-hide",
+    "shell-open"
+] }
 tokio = { version = "1", features = ["full"] }
 regex = "1.10"
 rand = "0.8"
@@ -19,4 +38,4 @@ reqwest = { version = "0.11", features = ["json"] }
 dirs = "5.0"
 
 [features]
-custom-protocol = [ "tauri/custom-protocol" ]
+custom-protocol = ["tauri/custom-protocol"]
