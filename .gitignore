@@ -14,3 +14,9 @@ node_modules
 *.sln
 *.sw?
 src-tauri/target
+*.pkg.tar.zst
+*.pkg.tar.xz
+*.pkg.tar.gz
+pkg/
+src/
+guiman/

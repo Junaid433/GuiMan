@@ -1,3 +1,4 @@
+#!/usr/bin/env xdg-open
 [Desktop Entry]
 Name=GuiMan
 Comment=The Ultimate Arch Linux Package Manager

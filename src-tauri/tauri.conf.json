@@ -7,7 +7,7 @@
     "withGlobalTauri": false
   },
   "package": {
-    "productName": "GuiMan",
+    "productName": "guiman",
     "version": "0.1.0"
   },
   "tauri": {
