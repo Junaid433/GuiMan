@@ -1,132 +1,127 @@
-#!/bin/bash
-
-# GuiMan Installation Script
-# For Arch-based distributions
-
+#!/usr/bin/env bash
+# install.sh - Manual installer for guiman (based on PKGBUILD)
+# Maintainer: Junaid Rahman <junaid.cloud2@gmail.com>
 set -e
 
+PKGNAME="guiman"
+PKGVER="0.1.1"
 REPO_URL="https://github.com/Junaid433/guiman"
-LATEST_RELEASE_URL="$REPO_URL/releases/latest"
+BUILD_DIR="$(pwd)/${PKGNAME}-build"
+INSTALL_DIR="/usr/local/bin"
+DESKTOP_DIR="/usr/share/applications"
+ICON_DIR="/usr/share/pixmaps"
+POLKIT_DIR="/usr/share/polkit-1/actions"
+DOC_DIR="/usr/share/doc/${PKGNAME}"
+LICENSE_DIR="/usr/share/licenses/${PKGNAME}"
 
-echo "🚀 GuiMan Installation Script"
-echo "=============================="
+echo "==> Installing ${PKGNAME} v${PKGVER}"
 
-# Check if running on Arch-based system
-if ! command -v pacman &> /dev/null; then
-    echo "❌ This script is designed for Arch-based distributions"
-    echo "   Please install manually or use the AppImage"
+# ------------------------------------------------------------------------------
+# Step 1: Install dependencies
+# ------------------------------------------------------------------------------
+echo "==> Checking dependencies..."
+
+DEPS=(webkit2gtk gtk3 libayatana-appindicator pacman sudo)
+MAKEDEPS=(nodejs npm git ffmpeg pkgconf openssl base-devel)
+
+for dep in "${DEPS[@]}" "${MAKEDEPS[@]}"; do
+    if ! pacman -Qi "$dep" &>/dev/null; then
+        echo "  -> Missing dependency: $dep"
+        MISSING_PKGS=1
+    fi
+done
+
+if [ "$MISSING_PKGS" = "1" ]; then
+    echo "==> Installing missing dependencies..."
+    sudo pacman -S --needed --noconfirm "${DEPS[@]}" "${MAKEDEPS[@]}"
+fi
+
+# ------------------------------------------------------------------------------
+# Step 2: Prepare build environment
+# ------------------------------------------------------------------------------
+echo "==> Preparing build environment..."
+
+rm -rf "$BUILD_DIR"
+git clone --branch "v${PKGVER}" "$REPO_URL" "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+# Ensure ffmpeg and npm
+command -v ffmpeg >/dev/null 2>&1 || { echo "ffmpeg not installed"; exit 1; }
+command -v npm >/dev/null 2>&1 || { echo "npm not installed"; exit 1; }
+
+# Ensure Rust installed
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "==> Rust not found. Installing via rustup..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+    source ~/.cargo/env
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
+# Fix icon and product name
+if [ -f "src-tauri/icons/icon.png" ]; then
+    ffmpeg -i src-tauri/icons/icon.png -vf "format=rgba" src-tauri/icons/icon_rgba.png -y -loglevel error
+    mv src-tauri/icons/icon_rgba.png src-tauri/icons/icon.png
+    echo "  -> Icon converted to RGBA format"
+fi
+
+if [ -f "src-tauri/tauri.conf.json" ]; then
+    sed -i 's/"productName": "GuiMan"/"productName": "guiman"/' src-tauri/tauri.conf.json
+    echo "  -> Product name fixed"
+fi
+
+# NPM dependencies
+echo "==> Installing npm dependencies..."
+npm ci --only=production --silent || npm install --silent
+
+# ------------------------------------------------------------------------------
+# Step 3: Build application
+# ------------------------------------------------------------------------------
+echo "==> Building guiman..."
+
+export CARGO_BUILD_JOBS="$(nproc)"
+export RUSTFLAGS="-C debuginfo=1 -C target-cpu=native -C opt-level=3"
+npm run tauri:build
+
+if [ ! -f "src-tauri/target/release/${PKGNAME}" ]; then
+    echo "Build failed: binary not found"
     exit 1
 fi
 
-# Check for AUR helpers
-AUR_HELPER=""
-if command -v yay &> /dev/null; then
-    AUR_HELPER="yay"
-elif command -v paru &> /dev/null; then
-    AUR_HELPER="paru"
-fi
+# ------------------------------------------------------------------------------
+# Step 4: Install files
+# ------------------------------------------------------------------------------
+echo "==> Installing files..."
 
-echo "🔍 Detected system: Arch Linux"
-if [ -n "$AUR_HELPER" ]; then
-    echo "🔍 Detected AUR helper: $AUR_HELPER"
-fi
+sudo install -Dm755 "src-tauri/target/release/${PKGNAME}" "${INSTALL_DIR}/${PKGNAME}"
 
-echo ""
-echo "📦 Installation Options:"
-echo "1. Install from AUR (Recommended)"
-echo "2. Download AppImage"
-echo "3. Build from source"
-echo ""
+[ -f "${PKGNAME}.desktop" ] && \
+    sudo install -Dm644 "${PKGNAME}.desktop" "${DESKTOP_DIR}/${PKGNAME}.desktop"
 
-read -p "Choose installation method (1-3): " choice
+[ -f "src-tauri/icons/icon.png" ] && \
+    sudo install -Dm644 "src-tauri/icons/icon.png" "${ICON_DIR}/${PKGNAME}.png"
 
-case $choice in
-    1)
-        if [ -z "$AUR_HELPER" ]; then
-            echo "❌ No AUR helper found. Please install yay or paru first:"
-            echo "   sudo pacman -S --needed git base-devel"
-            echo "   git clone https://aur.archlinux.org/yay.git"
-            echo "   cd yay && makepkg -si"
-            exit 1
-        fi
-        
-        echo "📦 Installing GuiMan from AUR..."
-        $AUR_HELPER -S guiman
-        ;;
-        
-    2)
-        echo "📥 Downloading AppImage..."
-        
-        # Get latest release URL
-        APPIMAGE_URL=$(curl -s $LATEST_RELEASE_URL | grep -o 'https://.*GuiMan.*AppImage' | head -1)
-        
-        if [ -z "$APPIMAGE_URL" ]; then
-            echo "❌ Could not find AppImage download URL"
-            exit 1
-        fi
-        
-        # Download AppImage
-        wget -O GuiMan.AppImage "$APPIMAGE_URL"
-        chmod +x GuiMan.AppImage
-        
-        # Move to /usr/local/bin if user wants
-        read -p "Install to /usr/local/bin? (y/N): " install_global
-        if [[ $install_global =~ ^[Yy]$ ]]; then
-            sudo mv GuiMan.AppImage /usr/local/bin/guiman
-            echo "✅ GuiMan installed to /usr/local/bin/guiman"
-        else
-            echo "✅ GuiMan.AppImage downloaded to current directory"
-            echo "   Run with: ./GuiMan.AppImage"
-        fi
-        ;;
-        
-    3)
-        echo "🔨 Building from source..."
-        
-        # Check dependencies
-        echo "📋 Checking build dependencies..."
-        
-        MISSING_DEPS=()
-        for dep in git rust nodejs npm; do
-            if ! command -v $dep &> /dev/null; then
-                MISSING_DEPS+=($dep)
-            fi
-        done
-        
-        if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
-            echo "❌ Missing dependencies: ${MISSING_DEPS[*]}"
-            echo "   Install with: sudo pacman -S ${MISSING_DEPS[*]}"
-            exit 1
-        fi
-        
-        # Clone and build
-        git clone $REPO_URL
-        cd guiman
-        npm install
-        npm run tauri build
-        
-        # Install
-        sudo cp src-tauri/target/release/guiman /usr/local/bin/
-        sudo cp guiman.desktop /usr/share/applications/
-        sudo cp src-tauri/icons/icon.png /usr/share/pixmaps/guiman.png
-        
-        echo "✅ GuiMan built and installed successfully"
-        ;;
-        
-    *)
-        echo "❌ Invalid choice"
-        exit 1
-        ;;
-esac
+[ -f "polkit/com.guiman.pkexec.policy" ] && \
+    sudo install -Dm644 "polkit/com.guiman.pkexec.policy" "${POLKIT_DIR}/com.guiman.pkexec.policy"
 
-echo ""
-echo "🎉 Installation complete!"
-echo ""
-echo "🚀 Launch GuiMan:"
-echo "   - From applications menu"
-echo "   - Or run: guiman"
-echo ""
-echo "📚 Documentation: $REPO_URL"
-echo "🐛 Report issues: $REPO_URL/issues"
-echo ""
-echo "Thank you for using GuiMan! 🙏"
+[ -f "LICENSE" ] && \
+    sudo install -Dm644 "LICENSE" "${LICENSE_DIR}/LICENSE"
+
+[ -f "README.md" ] && \
+    sudo install -Dm644 "README.md" "${DOC_DIR}/README.md"
+
+echo "==> Installation complete!"
+echo
+echo "✅ ${PKGNAME} has been installed successfully."
+echo "You can now run it using:  ${PKGNAME}"
+echo
+
+# ------------------------------------------------------------------------------
+# Step 5: Optional tools
+# ------------------------------------------------------------------------------
+echo "==> Optional: Install additional tools for extended functionality"
+echo "  - yay / paru : AUR helper support"
+echo "  - reflector  : Mirror management"
+echo "  - polkit     : Password-free privilege operations"
+echo
+echo "You can install them anytime with:"
+echo "  sudo pacman -S yay reflector polkit"
