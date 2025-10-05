@@ -1,6 +1,6 @@
 # Maintainer: Junaid Rahman <junaid433@example.com>
 pkgname=guiman
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="The Ultimate Arch Linux Package Manager - GUI with 100% pacman & AUR feature parity"
 arch=('x86_64')
