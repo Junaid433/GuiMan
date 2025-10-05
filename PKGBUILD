@@ -1,4 +1,4 @@
-# Maintainer: Junaid Rahman <junaid433@example.com>
+# Maintainer: Junaid Rahman <junaid.cloud2@gmail.com>
 pkgname=guiman
 pkgver=0.1.1
 pkgrel=1
