@@ -63,10 +63,13 @@ build() {
     cd "$srcdir/guiman"
 
     # Install npm dependencies
-    npm ci --only=production --silent || npm install --silent
+    npm ci --silent || npm install --silent
 
-    # Build Tauri app
-    npm run tauri:build || {
+    # Ensure Tauri CLI is available locally
+    npm install --silent @tauri-apps/cli
+
+    # Build Tauri app using npx
+    npx tauri build || {
         echo "Build failed" >&2
         exit 1
     }
