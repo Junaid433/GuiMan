@@ -35,24 +35,20 @@ conflicts=('guiman-bin' 'guiman-git')
 source=("git+$url.git")
 sha256sums=('SKIP')
 
-# Automatically detect version from Git tags
 pkgver() {
     cd "$srcdir/guiman"
-    # Get the latest tag like v0.1.2
     git describe --tags --abbrev=0 | sed 's/^v//'
 }
 
 prepare() {
     cd "$srcdir/guiman"
 
-    # Convert icon to RGBA if it exists
     if [ -f "src-tauri/icons/icon.png" ]; then
         ffmpeg -y -loglevel error -i src-tauri/icons/icon.png -vf "format=rgba" src-tauri/icons/icon_rgba.png
         mv src-tauri/icons/icon_rgba.png src-tauri/icons/icon.png
         echo "Icon converted to RGBA format"
     fi
 
-    # Fix productName in tauri config
     if [ -f "src-tauri/tauri.conf.json" ]; then
         sed -i 's/"productName": "GuiMan"/"productName": "guiman"/' src-tauri/tauri.conf.json
         echo "Fixed productName in tauri.conf.json"
@@ -62,13 +58,10 @@ prepare() {
 build() {
     cd "$srcdir/guiman"
 
-    # Install npm dependencies
     npm ci --silent || npm install --silent
 
-    # Ensure Tauri CLI is available locally
     npm install --silent @tauri-apps/cli
 
-    # Build Tauri app using npx
     npx tauri build || {
         echo "Build failed" >&2
         exit 1
@@ -78,19 +71,24 @@ build() {
 package() {
     cd "$srcdir/guiman"
 
-    # Install binary
-    install -Dm755 "src-tauri/target/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
+    # Create the wrapper script with environment variables
+    cat > "$pkgdir/usr/bin/$pkgname" << 'EOF'
+#!/bin/bash
+export WEBKIT_DISABLE_DMABUF_RENDERER=1
+export GDK_BACKEND=x11
+exec /usr/lib/guiman/guiman "$@"
+EOF
+    chmod +x "$pkgdir/usr/bin/$pkgname"
+    
+    # Install the actual binary to a different location
+    install -Dm755 "src-tauri/target/release/$pkgname" "$pkgdir/usr/lib/guiman/$pkgname"
 
-    # Desktop file
     [ -f "$pkgname.desktop" ] && install -Dm644 "$pkgname.desktop" "$pkgdir/usr/share/applications/$pkgname.desktop"
 
-    # Icon
     [ -f "src-tauri/icons/icon.png" ] && install -Dm644 "src-tauri/icons/icon.png" "$pkgdir/usr/share/pixmaps/$pkgname.png"
 
-    # Polkit policy
     [ -f "polkit/com.guiman.pkexec.policy" ] && install -Dm644 "polkit/com.guiman.pkexec.policy" "$pkgdir/usr/share/polkit-1/actions/com.guiman.pkexec.policy"
 
-    # License and README
     [ -f LICENSE ] && install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     [ -f README.md ] && install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
 }
