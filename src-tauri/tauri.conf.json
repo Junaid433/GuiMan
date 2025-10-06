@@ -34,7 +34,7 @@
     },
     "bundle": {
       "active": true,
-      "targets": "all",
+      "targets": "deb",
       "identifier": "com.guiman.app"
     },
     "security": {
