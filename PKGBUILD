@@ -73,13 +73,12 @@ package() {
     cd "$srcdir/guiman"
 
     # Create the wrapper script with environment variables
-    cat > "$pkgdir/usr/bin/$pkgname" << 'EOF'
+    install -Dm755 /dev/stdin "$pkgdir/usr/bin/$pkgname" << 'EOF'
 #!/bin/bash
 export WEBKIT_DISABLE_DMABUF_RENDERER=1
 export GDK_BACKEND=x11
 exec /usr/lib/guiman/guiman "$@"
 EOF
-    chmod +x "$pkgdir/usr/bin/$pkgname"
     
     # Install the actual binary to a different location
     install -Dm755 "src-tauri/target/release/$pkgname" "$pkgdir/usr/lib/guiman/$pkgname"
