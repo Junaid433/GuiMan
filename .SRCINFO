@@ -11,6 +11,8 @@ pkgbase = guiman
 	makedepends = ffmpeg
 	makedepends = pkgconf
 	makedepends = openssl
+	makedepends = rust
+	makedepends = cargo
 	makedepends = base-devel
 	depends = webkit2gtk
 	depends = gtk3
@@ -24,7 +26,7 @@ pkgbase = guiman
 	provides = guiman
 	conflicts = guiman-bin
 	conflicts = guiman-git
-	source = git+https://github.com/Junaid433/guiman.git#tag=v0.1.1
+	source = git+https://github.com/Junaid433/guiman.git
 	sha256sums = SKIP
 
 pkgname = guiman
