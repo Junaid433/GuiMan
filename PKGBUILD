@@ -44,7 +44,6 @@ prepare() {
     cd "$srcdir/guiman"
 
     if [ -f "src-tauri/icons/icon.png" ]; then
-        # Convert to RGBA format and make it square for AppImage compatibility
         ffmpeg -y -loglevel error -i src-tauri/icons/icon.png -vf "format=rgba,scale=512:512:force_original_aspect_ratio=increase,crop=512:512" src-tauri/icons/icon_rgba.png
         mv src-tauri/icons/icon_rgba.png src-tauri/icons/icon.png
         echo "Icon converted to RGBA format and made square"
@@ -72,15 +71,14 @@ build() {
 package() {
     cd "$srcdir/guiman"
 
-    # Create the wrapper script with environment variables
-    install -Dm755 /dev/stdin "$pkgdir/usr/bin/$pkgname" << 'EOF'
+    cat > "$pkgdir/usr/bin/$pkgname" << 'EOF'
 #!/bin/bash
 export WEBKIT_DISABLE_DMABUF_RENDERER=1
 export GDK_BACKEND=x11
 exec /usr/lib/guiman/guiman "$@"
 EOF
+    chmod +x "$pkgdir/usr/bin/$pkgname"
     
-    # Install the actual binary to a different location
     install -Dm755 "src-tauri/target/release/$pkgname" "$pkgdir/usr/lib/guiman/$pkgname"
 
     [ -f "$pkgname.desktop" ] && install -Dm644 "$pkgname.desktop" "$pkgdir/usr/share/applications/$pkgname.desktop"
