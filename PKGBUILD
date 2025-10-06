@@ -44,9 +44,10 @@ prepare() {
     cd "$srcdir/guiman"
 
     if [ -f "src-tauri/icons/icon.png" ]; then
-        ffmpeg -y -loglevel error -i src-tauri/icons/icon.png -vf "format=rgba" src-tauri/icons/icon_rgba.png
+        # Convert to RGBA format and make it square for AppImage compatibility
+        ffmpeg -y -loglevel error -i src-tauri/icons/icon.png -vf "format=rgba,scale=512:512:force_original_aspect_ratio=increase,crop=512:512" src-tauri/icons/icon_rgba.png
         mv src-tauri/icons/icon_rgba.png src-tauri/icons/icon.png
-        echo "Icon converted to RGBA format"
+        echo "Icon converted to RGBA format and made square"
     fi
 
     if [ -f "src-tauri/tauri.conf.json" ]; then
