@@ -84,7 +84,9 @@ EOF
 
     [ -f "src-tauri/icons/icon.png" ] && install -Dm644 "src-tauri/icons/icon.png" "$pkgdir/usr/share/pixmaps/$pkgname.png"
 
-    [ -f "polkit/com.guiman.pkexec.policy" ] && install -Dm644 "polkit/com.guiman.pkexec.policy" "$pkgdir/usr/share/polkit-1/actions/com.guiman.pkexec.policy"
+    if [ -f "polkit/com.guiman.pkexec.policy" ]; then
+        install -Dm644 "polkit/com.guiman.pkexec.policy" "$pkgdir/usr/share/polkit-1/actions/com.guiman.pkexec.policy"
+    fi
 
     [ -f LICENSE ] && install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     [ -f README.md ] && install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
