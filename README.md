@@ -21,15 +21,7 @@
 ### AUR
 ```bash
 yay -S guiman
-# or
 paru -S guiman
-```
-
-### AppImage
-```bash
-wget https://github.com/Junaid433/guiman/releases/latest/download/GuiMan-x86_64.AppImage
-chmod +x GuiMan-x86_64.AppImage
-./GuiMan-x86_64.AppImage
 ```
 
 ### Quick install
