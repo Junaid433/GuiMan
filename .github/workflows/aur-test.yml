@@ -1,0 +1,70 @@
+name: AUR Package Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  test-aur-installation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Arch Linux environment
+      uses: max-niederman/archlinux-action@v1
+      with:
+        packages: |
+          base-devel
+          git
+          sudo
+          pacman-contrib
+          
+    - name: Install yay AUR helper
+      run: |
+        cd /tmp
+        git clone https://aur.archlinux.org/yay.git
+        cd yay
+        makepkg -si --noconfirm --needed
+        
+    - name: Test AUR package installation
+      run: |
+        # Test package info
+        yay -Si guiman
+        
+        # Test package installation (dry run)
+        yay -S guiman --noconfirm --print
+        
+        # Verify package is available
+        yay -Ss guiman
+        
+    - name: Test package dependencies
+      run: |
+        # Check if all dependencies are available
+        yay -Si guiman | grep -E "(Depends On|Make Deps|Optional Deps)"
+        
+    - name: Verify package metadata
+      run: |
+        # Check package version and description
+        yay -Si guiman | grep -E "(Name|Version|Description|URL|License)"
+        
+    - name: Test package conflicts
+      run: |
+        # Verify no conflicts with existing packages
+        yay -Si guiman | grep "Conflicts With"
+        
+    - name: Check AUR package status
+      run: |
+        # Verify package is not out-of-date
+        yay -Si guiman | grep "Out-of-date"
+        
+    - name: Test package search
+      run: |
+        # Test that package can be found via search
+        yay -Ss guiman | grep -i guiman

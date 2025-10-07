@@ -7,8 +7,43 @@ on:
   workflow_dispatch:
 
 jobs:
+  test-aur:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Arch Linux environment
+      uses: max-niederman/archlinux-action@v1
+      with:
+        packages: |
+          base-devel
+          git
+          sudo
+          pacman-contrib
+          
+    - name: Install yay AUR helper
+      run: |
+        cd /tmp
+        git clone https://aur.archlinux.org/yay.git
+        cd yay
+        makepkg -si --noconfirm --needed
+        
+    - name: Test AUR package installation
+      run: |
+        # Test package info
+        yay -Si guiman
+        
+        # Test package installation (dry run)
+        yay -S guiman --noconfirm --print
+        
+        # Verify package is available and up-to-date
+        yay -Si guiman | grep "Out-of-date"
+        
   build-and-release:
     runs-on: ubuntu-latest
+    needs: test-aur
     
     steps:
     - name: Checkout code
