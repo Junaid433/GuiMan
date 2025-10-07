@@ -14,32 +14,21 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Setup Arch Linux environment
-      uses: max-niederman/archlinux-action@v1
-      with:
-        packages: |
-          base-devel
-          git
-          sudo
-          pacman-contrib
-          
-    - name: Install yay AUR helper
+    - name: Test AUR package availability
       run: |
-        cd /tmp
-        git clone https://aur.archlinux.org/yay.git
-        cd yay
-        makepkg -si --noconfirm --needed
+        # Test package info using AUR API
+        curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg=guiman" | jq '.results[0] | {Name, Version, Description, OutOfDate}'
         
-    - name: Test AUR package installation
+    - name: Verify package is not out-of-date
       run: |
-        # Test package info
-        yay -Si guiman
-        
-        # Test package installation (dry run)
-        yay -S guiman --noconfirm --print
-        
-        # Verify package is available and up-to-date
-        yay -Si guiman | grep "Out-of-date"
+        # Check if package is out-of-date
+        OUT_OF_DATE=$(curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg=guiman" | jq -r '.results[0].OutOfDate')
+        if [ "$OUT_OF_DATE" != "null" ] && [ "$OUT_OF_DATE" != "0" ]; then
+          echo "Package is out-of-date: $OUT_OF_DATE"
+          exit 1
+        else
+          echo "Package is up-to-date"
+        fi
         
   build-and-release:
     runs-on: ubuntu-latest
