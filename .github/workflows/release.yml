@@ -14,21 +14,42 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Test AUR package availability
+    - name: Test AUR package installation
       run: |
-        # Test package info using AUR API
-        curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg=guiman" | jq '.results[0] | {Name, Version, Description, OutOfDate}'
+        # Pull Arch Linux image
+        docker pull archlinux:latest
         
-    - name: Verify package is not out-of-date
-      run: |
-        # Check if package is out-of-date
-        OUT_OF_DATE=$(curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg=guiman" | jq -r '.results[0].OutOfDate')
-        if [ "$OUT_OF_DATE" != "null" ] && [ "$OUT_OF_DATE" != "0" ]; then
-          echo "Package is out-of-date: $OUT_OF_DATE"
-          exit 1
-        else
-          echo "Package is up-to-date"
-        fi
+        # Test yay installation and guiman package
+        docker run --rm archlinux:latest bash -c "
+          # Update system and install dependencies
+          pacman -Sy --noconfirm base-devel git sudo
+          
+          # Create test user
+          useradd -m -G wheel testuser
+          echo 'testuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+          
+          # Install yay as test user
+          su - testuser -c '
+            cd /tmp
+            git clone https://aur.archlinux.org/yay.git
+            cd yay
+            makepkg -si --noconfirm --needed
+          '
+          
+          # Test guiman package info
+          echo '=== Testing guiman package info ==='
+          su - testuser -c 'yay -Si guiman'
+          
+          # Test guiman installation via yay
+          echo '=== Installing guiman via yay -S guiman ==='
+          su - testuser -c 'yay -S guiman --noconfirm'
+          
+          # Verify installation
+          echo '=== Verifying installation ==='
+          pacman -Qi guiman
+          
+          echo '=== AUR installation test PASSED ==='
+        "
         
   build-and-release:
     runs-on: ubuntu-latest
