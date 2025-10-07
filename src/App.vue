@@ -27,8 +27,8 @@
             :compact-view="config.compactView"
             :show-descriptions="config.showDescriptions"
             @toggle-select="toggleSelect"
-            @install="handleInstallWithConfirm"
-            @remove="handleRemoveWithConfirm"
+            @install="handleInstall"
+            @remove="handleRemove"
             @show-details="showPackageDetails"
             @search-example="handleSearchExample"
           />
@@ -74,8 +74,8 @@
       :package-info="selectedPackageForDetails"
       :details="packageDetails"
       @close="showDetailsModal = false"
-      @install="handleInstallWithConfirm"
-      @remove="handleRemoveWithConfirm"
+      @install="handleInstall"
+      @remove="handleRemove"
       @show-dependencies="showDependencyGraph"
     />
     
@@ -196,35 +196,6 @@ export default {
       showConfirmDialog.value = true
     }
 
-    const handleInstallWithConfirm = (pkg) => {
-      showDetailsModal.value = false
-      if (config.value.confirmActions) {
-        showConfirm(
-          'Install Package',
-          `Are you sure you want to install ${pkg.name}?`,
-          () => handleInstall(pkg),
-          'warning',
-          'Install'
-        )
-      } else {
-        handleInstall(pkg)
-      }
-    }
-
-    const handleRemoveWithConfirm = (pkg) => {
-      showDetailsModal.value = false
-      if (config.value.confirmActions) {
-        showConfirm(
-          'Remove Package',
-          `Are you sure you want to remove ${pkg.name}?`,
-          () => handleRemove(pkg),
-          'danger',
-          'Remove'
-        )
-      } else {
-        handleRemove(pkg)
-      }
-    }
 
     const showPackageDetails = async (pkg) => {
       selectedPackageForDetails.value = pkg
@@ -303,21 +274,31 @@ export default {
 
     const handleCleanCache = async () => {
       showSettingsModal.value = false
-      currentOperation.value = 'Cleaning package cache (pacman -Scc + AUR helper -Scc)'
-      logs.value = []
-      operationCompleted.value = false
-      operationSuccess.value = false
-      showLogModal.value = true
+      
+      // Always show confirmation dialog for cache cleaning
+      showConfirm(
+        'Clean Package Cache',
+        'Are you sure you want to clean the package cache?\n\nThis will remove all cached package files to free up disk space. This action cannot be undone.',
+        async () => {
+          currentOperation.value = 'Cleaning package cache (pacman -Scc + AUR helper -Scc)'
+          logs.value = []
+          operationCompleted.value = false
+          operationSuccess.value = false
+          showLogModal.value = true
 
-      try {
-        await invoke('clean_cache', { 
-          aurHelper: config.value.aurHelper || 'yay' 
-        })
-      } catch (error) {
-        logs.value.push(`Error: ${error}`)
-        operationCompleted.value = true
-        operationSuccess.value = false
-      }
+          try {
+            await invoke('clean_cache', { 
+              aurHelper: config.value.aurHelper || 'yay' 
+            })
+          } catch (error) {
+            logs.value.push(`Error: ${error}`)
+            operationCompleted.value = true
+            operationSuccess.value = false
+          }
+        },
+        'warning',
+        'Clean Cache'
+      )
     }
 
 
@@ -473,35 +454,59 @@ export default {
     }
 
     const handleInstall = async (pkg) => {
-      currentOperation.value = `Installing ${pkg.name}`
-      logs.value = []
-      operationCompleted.value = false
-      operationSuccess.value = false
-      showLogModal.value = true
+      // Close details modal if open
+      showDetailsModal.value = false
+      
+      // Always show confirmation dialog for package installation
+      showConfirm(
+        'Install Package',
+        `Are you sure you want to install ${pkg.name}?\n\nThis will download and install the package on your system.`,
+        async () => {
+          currentOperation.value = `Installing ${pkg.name}`
+          logs.value = []
+          operationCompleted.value = false
+          operationSuccess.value = false
+          showLogModal.value = true
 
-      try {
-        await invoke('install_package', { pkg: pkg.name })
-      } catch (error) {
-        logs.value.push(`Error: ${error}`)
-        operationCompleted.value = true
-        operationSuccess.value = false
-      }
+          try {
+            await invoke('install_package', { pkg: pkg.name })
+          } catch (error) {
+            logs.value.push(`Error: ${error}`)
+            operationCompleted.value = true
+            operationSuccess.value = false
+          }
+        },
+        'warning',
+        'Install'
+      )
     }
 
     const handleRemove = async (pkg) => {
-      currentOperation.value = `Removing ${pkg.name}`
-      logs.value = []
-      operationCompleted.value = false
-      operationSuccess.value = false
-      showLogModal.value = true
+      // Close details modal if open
+      showDetailsModal.value = false
+      
+      // Always show confirmation dialog for package removal
+      showConfirm(
+        'Remove Package',
+        `Are you sure you want to remove ${pkg.name}?\n\nThis will uninstall the package from your system.`,
+        async () => {
+          currentOperation.value = `Removing ${pkg.name}`
+          logs.value = []
+          operationCompleted.value = false
+          operationSuccess.value = false
+          showLogModal.value = true
 
-      try {
-        await invoke('remove_package', { pkg: pkg.name })
-      } catch (error) {
-        logs.value.push(`Error: ${error}`)
-        operationCompleted.value = true
-        operationSuccess.value = false
-      }
+          try {
+            await invoke('remove_package', { pkg: pkg.name })
+          } catch (error) {
+            logs.value.push(`Error: ${error}`)
+            operationCompleted.value = true
+            operationSuccess.value = false
+          }
+        },
+        'danger',
+        'Remove'
+      )
     }
 
     const handleInstallSelected = async () => {
@@ -583,19 +588,28 @@ export default {
     }
 
     const handleUpdateSystem = async () => {
-      currentOperation.value = 'Updating system'
-      logs.value = []
-      operationCompleted.value = false
-      operationSuccess.value = false
-      showLogModal.value = true
+      // Always show confirmation dialog for system updates
+      showConfirm(
+        'Update System',
+        'Are you sure you want to update your system?\n\nThis will update all installed packages to their latest versions. This operation may take some time.',
+        async () => {
+          currentOperation.value = 'Updating system'
+          logs.value = []
+          operationCompleted.value = false
+          operationSuccess.value = false
+          showLogModal.value = true
 
-      try {
-        await invoke('update_system')
-      } catch (error) {
-        logs.value.push(`Error: ${error}`)
-        operationCompleted.value = true
-        operationSuccess.value = false
-      }
+          try {
+            await invoke('update_system')
+          } catch (error) {
+            logs.value.push(`Error: ${error}`)
+            operationCompleted.value = true
+            operationSuccess.value = false
+          }
+        },
+        'warning',
+        'Update System'
+      )
     }
 
     const showDependencyGraph = (packageName) => {
@@ -797,8 +811,6 @@ export default {
       toggleSelect,
       handleInstall,
       handleRemove,
-      handleInstallWithConfirm,
-      handleRemoveWithConfirm,
       handleInstallSelected,
       handleRemoveSelected,
       handleUpdateSystem,

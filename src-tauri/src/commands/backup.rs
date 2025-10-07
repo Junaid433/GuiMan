@@ -183,7 +183,7 @@ pub async fn restore_package_backup(backup_name: String, install_missing: bool, 
         
         // Install missing official packages
         if !missing_official.is_empty() {
-            let install_cmd = format!("pkexec pacman -S --needed --noconfirm {}", missing_official.join(" "));
+            let install_cmd = format!("pkexec pacman -S --needed {}", missing_official.join(" "));
             let output = Command::new("/bin/sh")
                 .args(&["-c", &install_cmd])
                 .output()
@@ -199,7 +199,7 @@ pub async fn restore_package_backup(backup_name: String, install_missing: bool, 
         // Install missing AUR packages
         if !missing_aur.is_empty() {
             let aur_helper = get_aur_helper().unwrap_or("yay".to_string());
-            let install_cmd = format!("{} -S --needed --noconfirm {}", aur_helper, missing_aur.join(" "));
+            let install_cmd = format!("{} -S --needed {}", aur_helper, missing_aur.join(" "));
             let output = Command::new("/bin/sh")
                 .args(&["-c", &install_cmd])
                 .output()

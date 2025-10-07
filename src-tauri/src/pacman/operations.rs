@@ -10,7 +10,7 @@ pub async fn install_package_async(window: Window, package: String) -> Result<Co
     
     tokio::spawn(async move {
         let mut child = Command::new("/usr/bin/pkexec")
-            .args(&["/usr/bin/pacman", "-S", "--noconfirm", &pkg_clone])
+            .args(&["/usr/bin/pacman", "-S", &pkg_clone])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -49,7 +49,7 @@ pub async fn remove_package_async(window: Window, package: String) -> Result<Com
     
     tokio::spawn(async move {
         let mut child = Command::new("/usr/bin/pkexec")
-            .args(&["/usr/bin/pacman", "-Rs", "--noconfirm", &pkg_clone])
+            .args(&["/usr/bin/pacman", "-Rs", &pkg_clone])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -83,7 +83,7 @@ pub async fn remove_package_async(window: Window, package: String) -> Result<Com
 pub async fn update_system_async(window: Window) -> Result<CommandResult, String> {
     tokio::spawn(async move {
         let mut child = Command::new("/usr/bin/pkexec")
-            .args(&["/usr/bin/pacman", "-Syu", "--noconfirm"])
+            .args(&["/usr/bin/pacman", "-Syu"])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -130,7 +130,7 @@ pub async fn clean_cache_async(window: Window, aur_helper: Option<String>) -> Re
         let _ = window.emit("cache-clean-output", "Starting cache clean...");
         
         let pacman_result = Command::new("/bin/sh")
-            .args(&["-c", "printf 'y\\ny\\n' | /usr/bin/pkexec /usr/bin/pacman -Scc --noconfirm 2>&1"])
+            .args(&["-c", "printf 'y\\ny\\n' | /usr/bin/pkexec /usr/bin/pacman -Scc 2>&1"])
             .output()
             .expect("Failed to start cache clean");
 
@@ -151,7 +151,7 @@ pub async fn clean_cache_async(window: Window, aur_helper: Option<String>) -> Re
         let _ = window.emit("cache-clean-output", format!("\nCleaning {} cache...", helper_cmd));
         
         let aur_result = Command::new("/bin/sh")
-            .args(&["-c", &format!("timeout 10 /bin/sh -c 'printf \"y\\ny\\n\" | /usr/bin/pkexec {} -Scc --noconfirm' 2>&1 || echo 'Cache clean completed or timed out'", helper_cmd)])
+            .args(&["-c", &format!("timeout 10 /bin/sh -c 'printf \"y\\ny\\n\" | /usr/bin/pkexec {} -Scc' 2>&1 || echo 'Cache clean completed or timed out'", helper_cmd)])
             .output();
         
         let mut aur_success = false;
