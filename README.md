@@ -53,6 +53,20 @@ GuiMan wraps pacman and your AUR helper (yay/paru) in a clean interface. Everyth
 
 The interface updates in real-time. When you're installing something, you see the actual pacman/makepkg output—no fake progress bars.
 
+## Screenshots
+
+<div align="center">
+
+<img src="screenshots/Screenshot_20251008_005718.png" alt="GuiMan Main Interface" width="800">
+
+<img src="screenshots/Screenshot_20251008_005730.png" alt="Package Management View" width="800">
+
+<img src="screenshots/Screenshot_20251008_005753.png" alt="System Operations" width="800">
+
+<img src="screenshots/Screenshot_20251008_005804.png" alt="Settings and Configuration" width="800">
+
+</div>
+
 ## Usage
 
 Launch with `guiman` or find it in your app menu.
