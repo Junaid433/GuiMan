@@ -17,7 +17,7 @@ pub async fn search_package(
     let mut scored_packages: Vec<(i64, PackageInfo)> = Vec::new();
 
     // Search official repositories
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Sl"])
         .output()
         .map_err(|e| format!("Failed to execute pacman: {}", e))?;
@@ -81,7 +81,7 @@ fn enrich_package_descriptions(packages: &mut [PackageInfo]) -> Result<(), Strin
         return Ok(());
     }
 
-    let info_output = Command::new("pacman")
+    let info_output = Command::new("/usr/bin/pacman")
         .args(&["-Si"])
         .args(&official_packages)
         .output()

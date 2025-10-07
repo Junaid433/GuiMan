@@ -14,7 +14,7 @@ pub fn get_aur_package_info(package: &str, helper: &str) -> Result<String, Strin
         return Err(format!("{} is not installed", helper_cmd));
     }
 
-    let output = Command::new(helper_cmd)
+    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
         .args(&["-Si", package])
         .output()
         .map_err(|e| format!("Failed to get AUR package info: {}", e))?;
@@ -38,7 +38,7 @@ pub fn list_aur_packages(helper: &str) -> Result<Vec<PackageInfo>, String> {
         return Err(format!("{} is not installed. Please install it first.", helper_cmd));
     }
 
-    let output = Command::new(helper_cmd)
+    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
         .args(&["-Sl", "aur"])
         .output()
         .map_err(|e| format!("Failed to list AUR packages: {}", e))?;
@@ -79,7 +79,7 @@ pub fn vote_aur_package(package: &str, helper: &str) -> Result<String, String> {
     }
 
     // Check if package exists in AUR first
-    let output = Command::new(helper_cmd)
+    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
         .args(&["-Si", package])
         .output()
         .map_err(|e| format!("Failed to check package: {}", e))?;
@@ -106,7 +106,7 @@ pub fn flag_aur_package(package: &str, helper: &str, comment: Option<String>) ->
     }
 
     // Check if package exists in AUR first
-    let output = Command::new(helper_cmd)
+    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
         .args(&["-Si", package])
         .output()
         .map_err(|e| format!("Failed to check package: {}", e))?;
@@ -139,7 +139,7 @@ pub fn adopt_aur_package(package: &str, helper: &str) -> Result<String, String> 
     }
 
     // Check if package exists in AUR first
-    let output = Command::new(helper_cmd)
+    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
         .args(&["-Si", package])
         .output()
         .map_err(|e| format!("Failed to check package: {}", e))?;
@@ -174,7 +174,7 @@ pub fn get_aur_build_info(package: &str, helper: &str) -> Result<String, String>
     }
 
     // Get detailed package information including build dependencies
-    let output = Command::new(helper_cmd)
+    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
         .args(&["-Si", package])
         .output()
         .map_err(|e| format!("Failed to get build info: {}", e))?;
@@ -203,8 +203,8 @@ pub fn install_aur_with_options(package: &str, helper: &str, options: Vec<String
         args.push(option);
     }
 
-    let output = Command::new("pkexec")
-        .arg(helper_cmd)
+    let output = Command::new("/usr/bin/pkexec")
+        .arg(&format!("/usr/bin/{}", helper_cmd))
         .args(&args)
         .output()
         .map_err(|e| format!("Failed to install with options: {}", e))?;

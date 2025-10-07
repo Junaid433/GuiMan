@@ -19,7 +19,7 @@ pub fn search_aur(
         return Ok(Vec::new());
     }
 
-    let output = Command::new(helper_cmd)
+    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
         .args(&["-Ss", query])
         .output()
         .map_err(|e| format!("Failed to search AUR: {}", e))?;

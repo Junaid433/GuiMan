@@ -34,7 +34,7 @@ pub async fn create_package_backup(name: String, description: String) -> Result<
     };
     
     // Get explicit packages (user-installed)
-    let explicit_output = Command::new("pacman")
+    let explicit_output = Command::new("/usr/bin/pacman")
         .args(&["-Qe"])
         .output()
         .map_err(|e| format!("Failed to get explicit packages: {}", e))?;
@@ -52,7 +52,7 @@ pub async fn create_package_backup(name: String, description: String) -> Result<
     // Get AUR packages
     let mut aur_packages = Vec::new();
     for package in &explicit_packages {
-        let output = Command::new("pacman")
+        let output = Command::new("/usr/bin/pacman")
             .args(&["-Qi", package])
             .output();
         
@@ -157,7 +157,7 @@ pub async fn restore_package_backup(backup_name: String, install_missing: bool, 
     
     if install_missing {
         // Get currently installed explicit packages
-        let current_output = Command::new("pacman")
+        let current_output = Command::new("/usr/bin/pacman")
             .args(&["-Qe"])
             .output()
             .map_err(|e| format!("Failed to get current packages: {}", e))?;
@@ -184,7 +184,7 @@ pub async fn restore_package_backup(backup_name: String, install_missing: bool, 
         // Install missing official packages
         if !missing_official.is_empty() {
             let install_cmd = format!("pkexec pacman -S --needed --noconfirm {}", missing_official.join(" "));
-            let output = Command::new("sh")
+            let output = Command::new("/bin/sh")
                 .args(&["-c", &install_cmd])
                 .output()
                 .map_err(|e| format!("Failed to install official packages: {}", e))?;
@@ -200,7 +200,7 @@ pub async fn restore_package_backup(backup_name: String, install_missing: bool, 
         if !missing_aur.is_empty() {
             let aur_helper = get_aur_helper().unwrap_or("yay".to_string());
             let install_cmd = format!("{} -S --needed --noconfirm {}", aur_helper, missing_aur.join(" "));
-            let output = Command::new("sh")
+            let output = Command::new("/bin/sh")
                 .args(&["-c", &install_cmd])
                 .output()
                 .map_err(|e| format!("Failed to install AUR packages: {}", e))?;
@@ -280,7 +280,7 @@ pub async fn list_pacman_hooks() -> Result<Vec<PackageHook>, String> {
 /// Export package list in various formats
 #[tauri::command]
 pub async fn export_packages(format: String) -> Result<String, String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Qe"])
         .output()
         .map_err(|e| format!("Failed to get package list: {}", e))?;
@@ -322,7 +322,7 @@ fn get_backup_directory() -> Result<String, String> {
 async fn is_aur_package(package: &str) -> bool {
     let aur_helpers = ["yay", "paru"];
     for helper in &aur_helpers {
-        let output = Command::new(helper)
+        let output = Command::new(&format!("/usr/bin/{}", helper))
             .args(&["-Si", package])
             .output();
         
@@ -341,7 +341,7 @@ async fn is_aur_package(package: &str) -> bool {
 fn get_aur_helper() -> Option<String> {
     let helpers = ["yay", "paru"];
     for helper in &helpers {
-        if Command::new("which").arg(helper).output().is_ok() {
+        if Command::new("/usr/bin/which").arg(helper).output().is_ok() {
             return Some(helper.to_string());
         }
     }

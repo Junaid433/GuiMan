@@ -10,7 +10,7 @@ pub struct FileInfo {
 /// List all files owned by a package
 #[tauri::command]
 pub async fn list_package_files(package: String) -> Result<Vec<FileInfo>, String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Ql", &package])
         .output()
         .map_err(|e| format!("Failed to list package files: {}", e))?;
@@ -44,7 +44,7 @@ pub async fn list_package_files(package: String) -> Result<Vec<FileInfo>, String
 /// Find which package owns a file
 #[tauri::command]
 pub async fn find_file_owner(file_path: String) -> Result<String, String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Qo", &file_path])
         .output()
         .map_err(|e| format!("Failed to find file owner: {}", e))?;
@@ -67,7 +67,7 @@ pub async fn find_file_owner(file_path: String) -> Result<String, String> {
 /// Search for files matching a pattern across all packages
 #[tauri::command]
 pub async fn search_files(pattern: String) -> Result<Vec<FileInfo>, String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Fl"])
         .output()
         .map_err(|e| format!("Failed to search files: {}", e))?;
@@ -103,7 +103,7 @@ pub async fn search_files(pattern: String) -> Result<Vec<FileInfo>, String> {
 /// Get backup files for a package
 #[tauri::command]
 pub async fn list_package_backups(package: String) -> Result<Vec<String>, String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Qii", &package])
         .output()
         .map_err(|e| format!("Failed to get package backups: {}", e))?;

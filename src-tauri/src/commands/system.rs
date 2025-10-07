@@ -28,7 +28,7 @@ pub async fn get_cache_size() -> Result<serde_json::Value, String> {
         .join(".cache/yay");
     
     let yay_size = if yay_cache_path.exists() {
-        let output = Command::new("du")
+        let output = Command::new("/usr/bin/du")
             .args(&["-sh", yay_cache_path.to_str().unwrap()])
             .output()
             .ok();
@@ -101,7 +101,7 @@ pub async fn get_popular_packages() -> Result<Vec<crate::models::PackageInfo>, S
     let mut result = Vec::new();
 
     for pkg_name in selected {
-        let output = Command::new("pacman")
+        let output = Command::new("/usr/bin/pacman")
             .args(&["-Ss", &format!("^{}$", pkg_name)])
             .output()
             .ok();
@@ -156,7 +156,7 @@ pub async fn install_polkit_policy() -> Result<CommandResult, String> {
         return Err("Polkit policy file not found".to_string());
     };
 
-    let output = Command::new("pkexec")
+    let output = Command::new("/usr/bin/pkexec")
         .args(&["cp", policy_source, "/usr/share/polkit-1/actions/"])
         .output()
         .map_err(|e| format!("Failed to install polkit policy: {}", e))?;

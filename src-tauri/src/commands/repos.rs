@@ -13,7 +13,7 @@ pub struct Repository {
 #[tauri::command]
 pub async fn list_repositories() -> Result<Vec<Repository>, String> {
     // Get all repos from pacman -Sl
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Sl"])
         .output()
         .map_err(|e| format!("Failed to list repositories: {}", e))?;
@@ -79,7 +79,7 @@ pub async fn list_repositories() -> Result<Vec<Repository>, String> {
 /// Get packages from a specific repository
 #[tauri::command]
 pub async fn get_repo_packages(repo: String) -> Result<Vec<crate::models::PackageInfo>, String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Sl", &repo])
         .output()
         .map_err(|e| format!("Failed to get repository packages: {}", e))?;
@@ -91,7 +91,7 @@ pub async fn get_repo_packages(repo: String) -> Result<Vec<crate::models::Packag
     let stdout = String::from_utf8_lossy(&output.stdout);
     
     // Get installed packages
-    let installed_output = Command::new("pacman")
+    let installed_output = Command::new("/usr/bin/pacman")
         .args(&["-Q"])
         .output()
         .map_err(|e| format!("Failed to get installed packages: {}", e))?;
@@ -131,7 +131,7 @@ pub async fn get_repo_packages(repo: String) -> Result<Vec<crate::models::Packag
 /// Sync package databases
 #[tauri::command]
 pub async fn sync_databases() -> Result<String, String> {
-    let output = Command::new("pkexec")
+    let output = Command::new("/usr/bin/pkexec")
         .args(&["pacman", "-Sy"])
         .output()
         .map_err(|e| format!("Failed to sync databases: {}", e))?;
@@ -223,7 +223,7 @@ pub async fn update_mirrorlist(mirrors: Vec<MirrorInfo>) -> Result<String, Strin
         .map_err(|e| format!("Failed to write temp mirrorlist: {}", e))?;
 
     // Use pkexec to copy to system location
-    let output = Command::new("pkexec")
+    let output = Command::new("/usr/bin/pkexec")
         .args(&["cp", temp_path, "/etc/pacman.d/mirrorlist"])
         .output()
         .map_err(|e| format!("Failed to update mirrorlist: {}", e))?;
@@ -239,7 +239,7 @@ pub async fn update_mirrorlist(mirrors: Vec<MirrorInfo>) -> Result<String, Strin
 #[tauri::command]
 pub async fn rank_mirrors(country: Option<String>, count: Option<usize>) -> Result<String, String> {
     // Check if reflector is installed
-    let check = Command::new("which")
+    let check = Command::new("/usr/bin/which")
         .arg("reflector")
         .output()
         .map_err(|e| format!("Failed to check for reflector: {}", e))?;
@@ -272,7 +272,7 @@ pub async fn rank_mirrors(country: Option<String>, count: Option<usize>) -> Resu
         args.push(&country_str);
     }
 
-    let output = Command::new("pkexec")
+    let output = Command::new("/usr/bin/pkexec")
         .args(&args)
         .output()
         .map_err(|e| format!("Failed to rank mirrors: {}", e))?;

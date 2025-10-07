@@ -216,7 +216,7 @@ fn extract_field(output: &str, field: &str) -> String {
 }
 
 fn get_required_by(package: &str) -> Result<Vec<String>, String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Qi", package])
         .output()
         .map_err(|e| format!("Failed to get required by: {}", e))?;
@@ -247,7 +247,7 @@ fn get_package_info_for_deps(package: &str) -> Result<(Vec<String>, Vec<String>,
     // println!("Getting package info for: {}", package); // Commented out to reduce spam
     
     // Try installed packages first
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Qi", package])
         .output();
     
@@ -264,7 +264,7 @@ fn get_package_info_for_deps(package: &str) -> Result<(Vec<String>, Vec<String>,
     }
     
     // Try repository packages
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Si", package])
         .output();
     
@@ -288,7 +288,7 @@ fn get_package_info_for_deps(package: &str) -> Result<(Vec<String>, Vec<String>,
     let aur_helpers = ["yay", "paru"];
     for helper in &aur_helpers {
         println!("Trying AUR helper: {} for package: {}", helper, package);
-        let output = Command::new(helper)
+        let output = Command::new(&format!("/usr/bin/{}", helper))
             .args(&["-Si", package])
             .output();
         

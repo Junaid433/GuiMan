@@ -9,8 +9,8 @@ pub async fn install_package_async(window: Window, package: String) -> Result<Co
     let pkg_clone = package.clone();
     
     tokio::spawn(async move {
-        let mut child = Command::new("pkexec")
-            .args(&["pacman", "-S", "--noconfirm", &pkg_clone])
+        let mut child = Command::new("/usr/bin/pkexec")
+            .args(&["/usr/bin/pacman", "-S", "--noconfirm", &pkg_clone])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -48,8 +48,8 @@ pub async fn remove_package_async(window: Window, package: String) -> Result<Com
     let pkg_clone = package.clone();
     
     tokio::spawn(async move {
-        let mut child = Command::new("pkexec")
-            .args(&["pacman", "-Rs", "--noconfirm", &pkg_clone])
+        let mut child = Command::new("/usr/bin/pkexec")
+            .args(&["/usr/bin/pacman", "-Rs", "--noconfirm", &pkg_clone])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -82,8 +82,8 @@ pub async fn remove_package_async(window: Window, package: String) -> Result<Com
 /// Update the system
 pub async fn update_system_async(window: Window) -> Result<CommandResult, String> {
     tokio::spawn(async move {
-        let mut child = Command::new("pkexec")
-            .args(&["pacman", "-Syu", "--noconfirm"])
+        let mut child = Command::new("/usr/bin/pkexec")
+            .args(&["/usr/bin/pacman", "-Syu", "--noconfirm"])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -123,14 +123,14 @@ pub async fn clean_cache_async(window: Window, aur_helper: Option<String>) -> Re
         let _ = window.emit("cache-clean-output", "Checking if pacman database is available...");
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
         
-        let _ = Command::new("sh")
-            .args(&["-c", "pkexec rm -f /var/lib/pacman/db.lck 2>/dev/null || true"])
+        let _ = Command::new("/bin/sh")
+            .args(&["-c", "/usr/bin/pkexec rm -f /var/lib/pacman/db.lck 2>/dev/null || true"])
             .output();
         
         let _ = window.emit("cache-clean-output", "Starting cache clean...");
         
-        let pacman_result = Command::new("sh")
-            .args(&["-c", "printf 'y\\ny\\n' | pkexec pacman -Scc --noconfirm 2>&1"])
+        let pacman_result = Command::new("/bin/sh")
+            .args(&["-c", "printf 'y\\ny\\n' | /usr/bin/pkexec /usr/bin/pacman -Scc --noconfirm 2>&1"])
             .output()
             .expect("Failed to start cache clean");
 
@@ -150,8 +150,8 @@ pub async fn clean_cache_async(window: Window, aur_helper: Option<String>) -> Re
         
         let _ = window.emit("cache-clean-output", format!("\nCleaning {} cache...", helper_cmd));
         
-        let aur_result = Command::new("sh")
-            .args(&["-c", &format!("timeout 10 sh -c 'printf \"y\\ny\\n\" | pkexec {} -Scc --noconfirm' 2>&1 || echo 'Cache clean completed or timed out'", helper_cmd)])
+        let aur_result = Command::new("/bin/sh")
+            .args(&["-c", &format!("timeout 10 /bin/sh -c 'printf \"y\\ny\\n\" | /usr/bin/pkexec {} -Scc --noconfirm' 2>&1 || echo 'Cache clean completed or timed out'", helper_cmd)])
             .output();
         
         let mut aur_success = false;

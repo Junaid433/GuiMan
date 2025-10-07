@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 /// List all installed packages
 pub fn list_installed_packages() -> Result<Vec<PackageInfo>, String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Q"])
         .output()
         .map_err(|e| format!("Failed to execute pacman: {}", e))?;
@@ -38,7 +38,7 @@ pub fn list_installed_packages() -> Result<Vec<PackageInfo>, String> {
 fn build_repository_map() -> Result<HashMap<String, String>, String> {
     let mut repo_map = HashMap::new();
     
-    let sync_output = Command::new("pacman")
+    let sync_output = Command::new("/usr/bin/pacman")
         .args(&["-Sl"])
         .output()
         .ok();
@@ -58,7 +58,7 @@ fn build_repository_map() -> Result<HashMap<String, String>, String> {
 
 /// Check for package updates
 pub fn check_for_updates() -> Result<Vec<PackageInfo>, String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Qu"])
         .output()
         .map_err(|e| format!("Failed to check updates: {}", e))?;
@@ -94,7 +94,7 @@ pub fn check_for_updates() -> Result<Vec<PackageInfo>, String> {
 
 /// Get the repository of a package
 fn get_package_repository(package: &str) -> Option<String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Si", package])
         .output()
         .ok()?;
@@ -115,7 +115,7 @@ fn get_package_repository(package: &str) -> Option<String> {
 
 /// List orphaned packages
 pub fn list_orphan_packages() -> Result<Vec<String>, String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Qdtq"])
         .output()
         .map_err(|e| format!("Failed to execute pacman: {}", e))?;
@@ -134,7 +134,7 @@ pub fn list_orphan_packages() -> Result<Vec<String>, String> {
 
 /// Get package history from pacman log
 pub fn get_package_history() -> Result<Vec<PackageInfo>, String> {
-    let output = Command::new("tail")
+    let output = Command::new("/usr/bin/tail")
         .args(&["-n", "500", "/var/log/pacman.log"])
         .output()
         .map_err(|e| format!("Failed to read pacman log: {}", e))?;
@@ -235,7 +235,7 @@ fn format_timestamp(timestamp: &str) -> String {
 /// Get detailed package information
 pub fn get_package_info(package: &str, repo: &str, is_installed: bool) -> Result<String, String> {
     let output = if is_installed {
-        Command::new("pacman")
+        Command::new("/usr/bin/pacman")
             .args(&["-Qi", package])
             .output()
             .map_err(|e| format!("Failed to get package info: {}", e))?
@@ -243,7 +243,7 @@ pub fn get_package_info(package: &str, repo: &str, is_installed: bool) -> Result
         // This will be handled by AUR module
         return Err("Use AUR module for AUR packages".to_string());
     } else {
-        Command::new("pacman")
+        Command::new("/usr/bin/pacman")
             .args(&["-Si", package])
             .output()
             .map_err(|e| format!("Failed to get package info: {}", e))?
@@ -258,7 +258,7 @@ pub fn get_package_info(package: &str, repo: &str, is_installed: bool) -> Result
 
 /// Export list of explicitly installed packages
 pub fn export_package_list() -> Result<Vec<String>, String> {
-    let output = Command::new("pacman")
+    let output = Command::new("/usr/bin/pacman")
         .args(&["-Qqe"])
         .output()
         .map_err(|e| format!("Failed to get package list: {}", e))?;
@@ -269,7 +269,7 @@ pub fn export_package_list() -> Result<Vec<String>, String> {
 
 /// Get cache size
 pub fn get_cache_size() -> Result<String, String> {
-    let output = Command::new("du")
+    let output = Command::new("/usr/bin/du")
         .args(&["-sh", "/var/cache/pacman/pkg"])
         .output()
         .map_err(|e| format!("Failed to get cache size: {}", e))?;

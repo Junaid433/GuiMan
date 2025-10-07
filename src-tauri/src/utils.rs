@@ -11,7 +11,7 @@ pub fn strip_ansi_codes(input: &str) -> String {
 
 /// Check if a command is available in PATH
 pub fn is_command_available(cmd: &str) -> bool {
-    Command::new("which")
+    Command::new("/usr/bin/which")
         .arg(cmd)
         .output()
         .map(|out| out.status.success())
