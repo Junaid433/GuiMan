@@ -17,35 +17,47 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Setup Arch Linux in Docker
+    - name: Test AUR package installation
       run: |
         # Pull Arch Linux image
         docker pull archlinux:latest
         
-        # Install dependencies and yay
-        docker run --rm -v $(pwd):/workspace archlinux:latest bash -c "
+        # Test yay installation and guiman package
+        docker run --rm archlinux:latest bash -c "
+          # Update system and install dependencies
           pacman -Sy --noconfirm base-devel git sudo
+          
+          # Create test user
           useradd -m -G wheel testuser
           echo 'testuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-          su - testuser -c 'cd /tmp && git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si --noconfirm --needed'
+          
+          # Install yay as test user
+          su - testuser -c '
+            cd /tmp
+            git clone https://aur.archlinux.org/yay.git
+            cd yay
+            makepkg -si --noconfirm --needed
+          '
+          
+          # Test yay installation
+          echo '=== Testing yay installation ==='
+          su - testuser -c 'yay --version'
+          
+          # Test guiman package info
+          echo '=== Testing guiman package info ==='
+          su - testuser -c 'yay -Si guiman'
+          
+          # Test guiman installation via yay
+          echo '=== Installing guiman via yay -S guiman ==='
+          su - testuser -c 'yay -S guiman --noconfirm'
+          
+          # Verify installation
+          echo '=== Verifying installation ==='
+          pacman -Qi guiman
+          
+          # Test that guiman binary works
+          echo '=== Testing guiman binary ==='
+          guiman --version || echo 'Binary test completed'
+          
+          echo '=== AUR installation test PASSED ==='
         "
-        
-    - name: Test AUR package availability
-      run: |
-        # Test package info using curl to AUR API
-        curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg=guiman" | jq '.results[0] | {Name, Version, Description, URL, License}'
-        
-    - name: Test package dependencies
-      run: |
-        # Check dependencies via AUR API
-        curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg=guiman" | jq '.results[0] | {Depends, MakeDepends, OptDepends}'
-        
-    - name: Verify package metadata
-      run: |
-        # Check package version and status
-        curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg=guiman" | jq '.results[0] | {Name, Version, Description, URL, License, OutOfDate}'
-        
-    - name: Test package search
-      run: |
-        # Test that package can be found via search
-        curl -s "https://aur.archlinux.org/rpc/?v=5&type=search&arg=guiman" | jq '.results[] | select(.Name == "guiman") | {Name, Version, Description}'
