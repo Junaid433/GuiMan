@@ -18,5 +18,5 @@ src-tauri/target
 *.pkg.tar.xz
 *.pkg.tar.gz
 pkg/
-src/
+# src/ - commented out as we need to track Vue components
 guiman/
