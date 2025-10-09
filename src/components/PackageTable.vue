@@ -1,13 +1,48 @@
 <template>
   <div class="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
-    <div v-if="loading" class="flex-1 flex items-center justify-center">
-      <div class="text-center">
-        <svg class="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p class="text-gray-600 dark:text-gray-400">Loading packages...</p>
-      </div>
+    <div v-if="loading" class="flex-1 overflow-auto scrollbar-thin">
+      <table class="w-full">
+        <thead class="bg-gray-100 dark:bg-gray-800 sticky top-0 z-10">
+          <tr>
+            <th class="px-4 py-3 text-left">
+              <div class="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Package Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Version</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Repository</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+          <tr v-for="i in 15" :key="i" class="animate-pulse">
+            <td class="px-4 py-3">
+              <div class="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="space-y-1">
+                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
+                <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-48"></div>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex gap-2">
+                <div class="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                <div class="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <div v-else-if="packages.length === 0" class="flex-1 flex items-center justify-center">

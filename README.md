@@ -49,13 +49,25 @@ The interface updates in real-time. When you're installing something, you see th
 
 <div align="center">
 
-<img src="screenshots/Screenshot_20251008_005718.png" alt="GuiMan Main Interface" width="800">
+<img src="screenshots/Screenshot_20251010_050722.png" alt="GuiMan Dashboard" width="800">
 
-<img src="screenshots/Screenshot_20251008_005804.png" alt="Settings and Configuration" width="800">
+<img src="screenshots/Screenshot_20251010_050747.png" alt="Package Installation" width="800">
 
-<img src="screenshots/Screenshot_20251008_005730.png" alt="Package Management View" width="800">
+<img src="screenshots/Screenshot_20251010_050818.png" alt="Package Details" width="800">
 
-<img src="screenshots/Screenshot_20251008_005753.png" alt="System Operations" width="800">
+<img src="screenshots/Screenshot_20251010_050833.png" alt="Package Grid View" width="800">
+
+<img src="screenshots/Screenshot_20251010_050905.png" alt="System Updates" width="800">
+
+<img src="screenshots/Screenshot_20251010_050912.png" alt="Cache Management" width="800">
+
+<img src="screenshots/Screenshot_20251010_050931.png" alt="Dependency Graph" width="800">
+
+<img src="screenshots/Screenshot_20251010_050954.png" alt="Package Groups" width="800">
+
+<img src="screenshots/Screenshot_20251010_051003.png" alt="Repository Management" width="800">
+
+<img src="screenshots/Screenshot_20251010_051010.png" alt="Settings & Configuration" width="800">
 
 </div>
 
@@ -64,16 +76,16 @@ The interface updates in real-time. When you're installing something, you see th
 Launch with `guiman` or find it in your app menu.
 
 Navigation is straightforward:
-- Home: search and install
-- Installed: what's on your system
-- Updates: what needs updating
-- Orphans: packages nothing depends on
-- Groups: package groups (base-devel, etc.)
-- Files: search by filename or find what owns a file
-- Repositories: manage your repos
-- Dependencies: visual dependency tree
-- History: transaction log
-- Settings: configure everything
+- **Dashboard**: System overview, quick actions, and analytics
+- **Installed**: What's on your system with modern card/table views
+- **Updates**: What needs updating with one-click system updates
+- **Orphans**: Packages nothing depends on
+- **Groups**: Package groups (base-devel, etc.)
+- **Files**: Search by filename or find what owns a file
+- **Repositories**: Manage your repos with mirror optimization
+- **Dependencies**: Visual dependency tree and package relationships
+- **History**: Transaction log and operation history
+- **Settings**: Configure everything including themes and notifications
 
 **Batch operations**: Select multiple packages and act on all at once.
 

@@ -1,25 +1,59 @@
 <template>
   <div :class="{ 'dark': darkMode }" class="h-screen w-screen">
     <div class="flex h-full bg-gray-50 dark:bg-gray-900">
-      <Sidebar 
-        :active-view="activeView" 
+      <Sidebar
+        :active-view="activeView"
         @change-view="handleViewChange"
         @toggle-theme="toggleTheme"
+        @toggle-sidebar="toggleSidebar"
         @open-settings="showSettingsModal = true"
         :dark-mode="darkMode"
         :aur-enabled="config.aurSupport"
+        :collapsed="config.sidebarCollapsed"
       />
       
       <div class="flex-1 flex flex-col overflow-hidden">
-        <SearchBar 
-          v-model="searchQuery"
-          :active-view="activeView"
-          @search="handleSearch"
-          @update-system="handleUpdateSystem"
-        />
+        <div class="relative">
+          <SearchBar
+            ref="searchBar"
+            v-model="searchQuery"
+            :active-view="activeView"
+            :view-mode="config.viewMode"
+            :unread-count="unreadNotificationCount"
+            :has-active-notifications="hasActiveNotifications"
+            @search="handleSearch"
+            @update-system="handleUpdateSystem"
+            @toggle-view-mode="toggleViewMode"
+            @show-keyboard-shortcuts="showKeyboardShortcutsModal = true"
+            @toggle-notifications="toggleNotificationCenter"
+          />
+
+          <!-- Notification System positioned relative to SearchBar -->
+          <NotificationSystem
+            ref="notificationSystem"
+            :config="config"
+            :show-center="showNotificationCenter"
+            @action="handleNotificationAction"
+            @close="showNotificationCenter = false"
+            class="absolute top-full mt-1"
+            style="right: 120px;"
+          />
+        </div>
         
         <div class="flex-1 overflow-hidden">
-          <PackageTable 
+          <Dashboard
+            v-if="activeView === 'dashboard'"
+            :system-stats="systemStats"
+            :recent-updates="recentUpdates"
+            :popular-packages="popularPackages"
+            :packages="packages"
+            :loading="loading"
+            @update-system="handleUpdateSystem"
+            @change-view="handleViewChange"
+            @show-details="showPackageDetails"
+          />
+          <PackageTable
+            v-else-if="config.viewMode === 'table' && activeView !== 'dashboard'"
             :packages="displayPackages"
             :loading="loading"
             :selected-packages="selectedPackages"
@@ -31,6 +65,21 @@
             @remove="handleRemove"
             @show-details="showPackageDetails"
             @search-example="handleSearchExample"
+          />
+          <PackageGrid
+            v-else-if="activeView !== 'dashboard'"
+            :packages="displayPackages"
+            :loading="loading"
+            :selected-packages="selectedPackages"
+            :active-view="activeView"
+            @toggle-select="toggleSelect"
+            @install="handleInstall"
+            @remove="handleRemove"
+            @show-details="showPackageDetails"
+            @search-example="handleSearchExample"
+            @select-all="handleSelectAll"
+            @clear-selection="handleClearSelection"
+            @show-dependencies="handleShowDependencies"
           />
         </div>
         
@@ -90,6 +139,52 @@
       v-if="showBackupModal"
       @close="showBackupModal = false"
     />
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div v-if="showKeyboardShortcutsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="showKeyboardShortcutsModal = false">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4" @click.stop>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Keyboard Shortcuts</h3>
+            <button @click="showKeyboardShortcutsModal = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </div>
+          <div class="space-y-3">
+            <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+              <span class="text-gray-700 dark:text-gray-300">Focus Search</span>
+              <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-sm">Ctrl+F</kbd>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+              <span class="text-gray-700 dark:text-gray-300">Toggle View Mode</span>
+              <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-sm">Ctrl+T</kbd>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+              <span class="text-gray-700 dark:text-gray-300">Toggle Sidebar</span>
+              <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-sm">Ctrl+B</kbd>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+              <span class="text-gray-700 dark:text-gray-300">Update System</span>
+              <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-sm">Ctrl+U</kbd>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+              <span class="text-gray-700 dark:text-gray-300">Refresh View</span>
+              <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-sm">Ctrl+R</kbd>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+              <span class="text-gray-700 dark:text-gray-300">Clear Search / Close Modals</span>
+              <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-sm">Escape</kbd>
+            </div>
+            <div class="flex justify-between items-center py-2">
+              <span class="text-gray-700 dark:text-gray-300">Show Shortcuts</span>
+              <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-sm">F1</kbd>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
   </div>
 </template>
@@ -110,6 +205,9 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import PackageDetailsModal from './components/PackageDetailsModal.vue'
 import DependencyGraph from './components/DependencyGraph.vue'
 import BackupModal from './components/BackupModal.vue'
+import Dashboard from './components/Dashboard.vue'
+import PackageGrid from './components/PackageGrid.vue'
+import NotificationSystem from './components/NotificationSystem.vue'
 import configManager from './utils/config.js'
 
 export default {
@@ -118,16 +216,19 @@ export default {
     Sidebar,
     SearchBar,
     PackageTable,
+    PackageGrid,
     StatusBar,
     LogModal,
     SettingsModal,
     ConfirmDialog,
     PackageDetailsModal,
     DependencyGraph,
-    BackupModal
+    BackupModal,
+    Dashboard,
+    NotificationSystem
   },
   setup() {
-    const activeView = ref('installed')
+    const activeView = ref('dashboard')
     const searchQuery = ref('')
     const packages = ref([])
     const loading = ref(false)
@@ -150,15 +251,46 @@ export default {
     const showDependencyGraphModal = ref(false)
     const dependencyGraphPackage = ref('')
     const showBackupModal = ref(false)
+    const showKeyboardShortcutsModal = ref(false)
+    const showNotificationCenter = ref(false)
+    const notificationSystem = ref(null)
+    const systemStats = ref({
+      totalPackages: 0,
+      updatesAvailable: 0,
+      orphans: 0,
+      aurPackages: 0
+    })
+    const recentUpdates = ref([])
+    const popularPackages = ref([])
     let refreshInterval = null
 
     const displayPackages = computed(() => {
       return packages.value
     })
 
+    const unreadNotificationCount = computed(() => {
+      if (!notificationSystem.value) return 0
+      return notificationSystem.value.notifications.filter(n => !n.read).length
+    })
+
+    const hasActiveNotifications = computed(() => {
+      if (!notificationSystem.value) return false
+      return notificationSystem.value.activeNotifications.length > 0
+    })
+
     const toggleTheme = () => {
       darkMode.value = !darkMode.value
       config.value.theme = darkMode.value ? 'dark' : 'light'
+      configManager.save(config.value)
+    }
+
+    const toggleViewMode = () => {
+      config.value.viewMode = config.value.viewMode === 'table' ? 'cards' : 'table'
+      configManager.save(config.value)
+    }
+
+    const toggleSidebar = () => {
+      config.value.sidebarCollapsed = !config.value.sidebarCollapsed
       configManager.save(config.value)
     }
 
@@ -315,6 +447,38 @@ export default {
 
       try {
         switch (view) {
+          case 'dashboard':
+            // Load dashboard data without loading all installed packages
+            try {
+              const [orphans, updates, popular, history, installed] = await Promise.all([
+                invoke('list_orphans'),
+                invoke('check_updates'),
+                invoke('get_popular_packages'),
+                invoke('get_package_history'),
+                invoke('list_installed')
+              ])
+
+              systemStats.value = {
+                totalPackages: installed.length,
+                updatesAvailable: updates.length,
+                orphans: orphans.length,
+                aurPackages: installed.filter(p => p.repo === 'aur').length
+              }
+
+              popularPackages.value = popular.slice(0, 6)
+              recentUpdates.value = history.slice(0, 5).map(h => ({
+                name: h.name,
+                oldVersion: h.old_version || 'Unknown',
+                newVersion: h.new_version || h.version,
+                date: h.date || new Date().toISOString()
+              }))
+
+              // Store packages for analytics but don't display them
+              packages.value = installed
+            } catch (error) {
+              console.error('Failed to load dashboard data:', error)
+            }
+            break
           case 'installed':
             packages.value = await invoke('list_installed')
             break
@@ -442,6 +606,10 @@ export default {
       } finally {
         loading.value = false
       }
+    }
+
+    const isSelected = (pkg) => {
+      return selectedPackages.value.some(p => p.name === pkg.name)
     }
 
     const toggleSelect = (pkg) => {
@@ -612,6 +780,41 @@ export default {
       )
     }
 
+    const handleSelectAll = () => {
+      packages.value.forEach(pkg => {
+        if (!isSelected(pkg)) {
+          toggleSelect(pkg)
+        }
+      })
+    }
+
+    const handleClearSelection = () => {
+      selectedPackages.value.forEach(pkg => {
+        toggleSelect(pkg)
+      })
+    }
+
+    const handleShowDependencies = (packageName) => {
+      showDependencyGraph(packageName)
+    }
+
+    const toggleNotificationCenter = () => {
+      showNotificationCenter.value = !showNotificationCenter.value
+    }
+
+    const handleNotificationAction = ({ notificationId, action }) => {
+      switch (action.action) {
+        case 'view-logs':
+          showLogModal.value = true
+          break
+        case 'view-updates':
+          handleViewChange('updates')
+          break
+        default:
+          console.log('Unknown notification action:', action)
+      }
+    }
+
     const showDependencyGraph = (packageName) => {
       dependencyGraphPackage.value = packageName
       showDependencyGraphModal.value = true
@@ -672,35 +875,99 @@ export default {
       }
     }
 
-    const sendNotif = async (title, body) => {
-      if (!config.value.showNotifications) return
-      
-      try {
-        let permissionGranted = await isPermissionGranted()
-        if (!permissionGranted) {
-          const permission = await requestPermission()
-          permissionGranted = permission === 'granted'
-        }
-        if (permissionGranted) {
-          sendNotification({ title, body })
-        }
-      } catch (error) {
-        console.error('Notification error:', error)
-      }
+    const sendNotif = (type, title, message, options = {}) => {
+      if (!notificationSystem.value) return
+
+      notificationSystem.value.show(type, title, message, options)
     }
 
 
+    const handleKeydown = (event) => {
+      // Ignore if user is typing in an input
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+        return
+      }
+
+      // Ctrl+F or Cmd+F: Focus search bar
+      if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+        event.preventDefault()
+        const searchInput = document.querySelector('input[type="text"]')
+        if (searchInput) {
+          searchInput.focus()
+          searchInput.select()
+        }
+        return
+      }
+
+      // Ctrl+T: Toggle view mode
+      if ((event.ctrlKey || event.metaKey) && event.key === 't') {
+        event.preventDefault()
+        toggleViewMode()
+        return
+      }
+
+      // Ctrl+B: Toggle sidebar
+      if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
+        event.preventDefault()
+        toggleSidebar()
+        return
+      }
+
+      // Escape: Clear search
+      if (event.key === 'Escape') {
+        if (searchQuery.value) {
+          searchQuery.value = ''
+          handleSearch()
+        } else if (showDetailsModal.value) {
+          showDetailsModal.value = false
+        } else if (showLogModal.value) {
+          closeLogModal()
+        } else if (showSettingsModal.value) {
+          showSettingsModal.value = false
+        } else if (showConfirmDialog.value) {
+          showConfirmDialog.value = false
+        }
+        return
+      }
+
+      // Ctrl+U: Update system
+      if ((event.ctrlKey || event.metaKey) && event.key === 'u') {
+        event.preventDefault()
+        handleUpdateSystem()
+        return
+      }
+
+      // Ctrl+R: Refresh current view
+      if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+        event.preventDefault()
+        handleViewChange(activeView.value)
+        return
+      }
+
+      // F1: Show keyboard shortcuts
+      if (event.key === 'F1') {
+        event.preventDefault()
+        showKeyboardShortcutsModal.value = true
+        return
+      }
+    }
+
     onMounted(async () => {
       await restoreWindowState()
+
+      // Add global keyboard shortcuts
+      document.addEventListener('keydown', handleKeydown)
 
       if (config.value.checkUpdatesOnStartup) {
         await handleViewChange('updates')
         const updateCount = packages.value.length
         if (updateCount > 0) {
-          await sendNotif('Updates Available', `${updateCount} package update${updateCount > 1 ? 's' : ''} available`)
+          sendNotif('info', 'Updates Available', `${updateCount} package update${updateCount > 1 ? 's' : ''} available`, {
+            actions: [{ label: 'View Updates', action: 'view-updates' }]
+          })
         }
       } else {
-        await handleViewChange('installed')
+        await handleViewChange('dashboard')
       }
 
       setupAutoRefresh()
@@ -732,41 +999,53 @@ export default {
 
       listen('install-complete', (event) => {
         operationCompleted.value = true
-        operationSuccess.value = event.payload
-        logs.value.push(event.payload ? '✓ Installation complete!' : '✗ Installation failed!')
-        if (event.payload) {
-          sendNotif('Installation Complete', 'Package installation finished successfully')
+        operationSuccess.value = event.payload.success
+        logs.value.push(event.payload.message)
+        if (event.payload.success) {
+          sendNotif('success', 'Installation Complete', event.payload.message, {
+            actions: [{ label: 'View Logs', action: 'view-logs' }]
+          })
         } else {
-          sendNotif('Installation Failed', 'Package installation encountered an error')
+          sendNotif('error', 'Installation Failed', event.payload.message, {
+            actions: [{ label: 'View Logs', action: 'view-logs', primary: true }]
+          })
         }
       })
 
       listen('remove-complete', (event) => {
         operationCompleted.value = true
-        operationSuccess.value = event.payload
-        logs.value.push(event.payload ? '✓ Removal complete!' : '✗ Removal failed!')
-        if (event.payload) {
-          sendNotif('Removal Complete', 'Package removal finished successfully')
+        operationSuccess.value = event.payload.success
+        logs.value.push(event.payload.message)
+        if (event.payload.success) {
+          sendNotif('success', 'Removal Complete', event.payload.message, {
+            actions: [{ label: 'View Logs', action: 'view-logs' }]
+          })
         } else {
-          sendNotif('Removal Failed', 'Package removal encountered an error')
+          sendNotif('error', 'Removal Failed', event.payload.message, {
+            actions: [{ label: 'View Logs', action: 'view-logs', primary: true }]
+          })
         }
       })
 
       listen('update-complete', (event) => {
         operationCompleted.value = true
-        operationSuccess.value = event.payload
-        logs.value.push(event.payload ? '✓ Update complete!' : '✗ Update failed!')
-        if (event.payload) {
-          sendNotif('System Update Complete', 'All packages updated successfully')
+        operationSuccess.value = event.payload.success
+        logs.value.push(event.payload.message)
+        if (event.payload.success) {
+          sendNotif('success', 'System Update Complete', event.payload.message, {
+            actions: [{ label: 'View Logs', action: 'view-logs' }]
+          })
         } else {
-          sendNotif('System Update Failed', 'System update encountered an error')
+          sendNotif('error', 'System Update Failed', event.payload.message, {
+            actions: [{ label: 'View Logs', action: 'view-logs', primary: true }]
+          })
         }
       })
 
       listen('cache-clean-complete', async (event) => {
         operationCompleted.value = true
-        operationSuccess.value = event.payload
-        logs.value.push(event.payload)
+        operationSuccess.value = event.payload.success
+        logs.value.push(event.payload.message)
         
         // Mark that cache was just cleaned so we refresh when modal reopens
         cacheJustCleaned.value = true
@@ -777,6 +1056,8 @@ export default {
       if (refreshInterval) {
         clearInterval(refreshInterval)
       }
+      // Remove keyboard event listener
+      document.removeEventListener('keydown', handleKeydown)
       await saveWindowState()
     })
 
@@ -803,7 +1084,16 @@ export default {
       showDependencyGraphModal,
       dependencyGraphPackage,
       showBackupModal,
+      showKeyboardShortcutsModal,
+      showNotificationCenter,
+      notificationSystem,
+      systemStats,
+      recentUpdates,
+      popularPackages,
       toggleTheme,
+      toggleViewMode,
+      toggleSidebar,
+      toggleNotificationCenter,
       saveSettings,
       handleViewChange,
       handleSearch,
@@ -818,6 +1108,10 @@ export default {
       showPackageDetails,
       showDependencyGraph,
       handleDependencyPackageClick,
+      handleSelectAll,
+      handleClearSelection,
+      handleShowDependencies,
+      handleNotificationAction,
       closeLogModal
     }
   }

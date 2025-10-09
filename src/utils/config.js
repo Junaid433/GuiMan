@@ -4,6 +4,8 @@ const DEFAULT_CONFIG = {
   refreshInterval: 300,
   confirmActions: true,
   showNotifications: true,
+  notificationSound: true,
+  notificationDuration: 5000, // ms
   checkUpdatesOnStartup: true,
   aurSupport: false,
   aurHelper: 'yay',
@@ -12,6 +14,8 @@ const DEFAULT_CONFIG = {
   language: 'en',
   compactView: false,
   showDescriptions: true,
+  viewMode: 'table', // 'table' or 'cards'
+  sidebarCollapsed: false,
   downloadTimeout: 180,
   checkDiskSpace: true,
   verifyPackages: true,

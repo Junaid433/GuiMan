@@ -1,6 +1,8 @@
 use crate::models::{PackageInfo, CommandResult};
 use crate::{pacman, aur, utils};
 use tauri::Window;
+use std::process::Command;
+use serde_json;
 
 #[tauri::command]
 pub async fn list_installed() -> Result<Vec<PackageInfo>, String> {
@@ -48,7 +50,20 @@ pub async fn list_aur_packages(helper: String) -> Result<Vec<PackageInfo>, Strin
 
 #[tauri::command]
 pub async fn install_package(window: Window, pkg: String) -> Result<CommandResult, String> {
-    pacman::install_package_async(window, pkg).await
+    // Check if package exists in official repositories
+    let is_official = Command::new("/usr/bin/pacman")
+        .args(&["-Si", &pkg])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+
+    if is_official {
+        // Use pacman for official packages
+        pacman::install_package_async(window, pkg).await
+    } else {
+        // Use AUR helper for AUR packages (async with real-time output)
+        aur::install_aur_package_async(window, pkg).await
+    }
 }
 
 #[tauri::command]

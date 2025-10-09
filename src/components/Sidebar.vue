@@ -1,19 +1,40 @@
 <template>
-  <div class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-    <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-        <svg class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+  <div :class="[
+    'bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300 ease-in-out',
+    collapsed ? 'w-16' : 'w-64'
+  ]">
+    <div :class="[
+      'border-b border-gray-200 dark:border-gray-700 flex items-center',
+      collapsed ? 'p-4 justify-center' : 'p-6'
+    ]">
+      <div class="flex items-center gap-2 flex-1 min-w-0">
+        <svg class="w-8 h-8 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
           <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
         </svg>
-        GuiMan
-      </h1>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Package Manager</p>
+        <div v-if="!collapsed" class="flex-1 min-w-0">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-white truncate">GuiMan</h1>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Package Manager</p>
+        </div>
+      </div>
+      <button
+        @click="$emit('toggle-sidebar')"
+        class="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+        :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+      >
+        <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+          <path v-if="!collapsed" fill-rule="evenodd" d="M15.707 15.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 111.414 1.414L12.414 11H16a1 1 0 110 2h-3.586l2.293 2.293zM7 4a1 1 0 00-1 1v10a1 1 0 102 0V5a1 1 0 00-1-1z" clip-rule="evenodd" />
+          <path v-else fill-rule="evenodd" d="M4.293 15.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L9.586 13H4a1 1 0 010-2h5.586l-1.293-1.293zM13 4a1 1 0 100 2h-2a1 1 0 100 2h2a3 3 0 000-6z" clip-rule="evenodd" />
+        </svg>
+      </button>
     </div>
 
-    <nav class="flex-1 p-4 space-y-4 overflow-y-auto">
+    <nav :class="[
+      'flex-1 space-y-4 overflow-y-auto',
+      collapsed ? 'p-2' : 'p-4'
+    ]">
       <!-- Packages Section -->
       <div>
-        <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">
+        <div v-if="!collapsed" class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">
           Packages
         </div>
         <div class="space-y-1">
@@ -22,21 +43,23 @@
             :key="item.id"
             @click="$emit('change-view', item.id)"
             :class="[
-              'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm',
+              'w-full flex items-center rounded-lg transition-all',
+              collapsed ? 'p-3 justify-center' : 'gap-3 px-3 py-2 text-sm',
               activeView === item.id
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
             ]"
+            :title="collapsed ? item.label : ''"
           >
-            <span v-html="item.icon"></span>
-            <span class="font-medium">{{ item.label }}</span>
+            <span v-html="item.icon" :class="collapsed ? 'w-5 h-5' : 'w-5 h-5'"></span>
+            <span v-if="!collapsed" class="font-medium">{{ item.label }}</span>
           </button>
         </div>
       </div>
 
       <!-- System Section -->
       <div>
-        <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">
+        <div v-if="!collapsed" class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">
           System
         </div>
         <div class="space-y-1">
@@ -45,21 +68,23 @@
             :key="item.id"
             @click="$emit('change-view', item.id)"
             :class="[
-              'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm',
+              'w-full flex items-center rounded-lg transition-all',
+              collapsed ? 'p-3 justify-center' : 'gap-3 px-3 py-2 text-sm',
               activeView === item.id
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
             ]"
+            :title="collapsed ? item.label : ''"
           >
-            <span v-html="item.icon"></span>
-            <span class="font-medium">{{ item.label }}</span>
+            <span v-html="item.icon" :class="collapsed ? 'w-5 h-5' : 'w-5 h-5'"></span>
+            <span v-if="!collapsed" class="font-medium">{{ item.label }}</span>
           </button>
         </div>
       </div>
 
       <!-- Tools Section -->
       <div>
-        <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">
+        <div v-if="!collapsed" class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">
           Tools
         </div>
         <div class="space-y-1">
@@ -68,41 +93,54 @@
             :key="item.id"
             @click="$emit('change-view', item.id)"
             :class="[
-              'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm',
+              'w-full flex items-center rounded-lg transition-all',
+              collapsed ? 'p-3 justify-center' : 'gap-3 px-3 py-2 text-sm',
               activeView === item.id
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
             ]"
+            :title="collapsed ? item.label : ''"
           >
-            <span v-html="item.icon"></span>
-            <span class="font-medium">{{ item.label }}</span>
+            <span v-html="item.icon" :class="collapsed ? 'w-5 h-5' : 'w-5 h-5'"></span>
+            <span v-if="!collapsed" class="font-medium">{{ item.label }}</span>
           </button>
         </div>
       </div>
     </nav>
 
-    <div class="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+    <div :class="[
+      'border-t border-gray-200 dark:border-gray-700 space-y-2',
+      collapsed ? 'p-2' : 'p-4'
+    ]">
       <button
         @click="$emit('open-settings')"
-        class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+        :class="[
+          'w-full flex items-center rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all',
+          collapsed ? 'p-3 justify-center' : 'gap-3 px-4 py-3'
+        ]"
+        :title="collapsed ? 'Settings' : ''"
       >
-        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
         </svg>
-        <span class="font-medium">Settings</span>
+        <span v-if="!collapsed" class="font-medium">Settings</span>
       </button>
-      
+
       <button
         @click="$emit('toggle-theme')"
-        class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+        :class="[
+          'w-full flex items-center rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all',
+          collapsed ? 'p-3 justify-center' : 'gap-3 px-4 py-3'
+        ]"
+        :title="collapsed ? (darkMode ? 'Light Mode' : 'Dark Mode') : ''"
       >
-        <svg v-if="!darkMode" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <svg v-if="!darkMode" class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
           <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
         </svg>
-        <svg v-else class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <svg v-else class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
         </svg>
-        <span class="font-medium">{{ darkMode ? 'Light' : 'Dark' }} Mode</span>
+        <span v-if="!collapsed" class="font-medium">{{ darkMode ? 'Light' : 'Dark' }} Mode</span>
       </button>
     </div>
   </div>
@@ -114,11 +152,17 @@ export default {
   props: {
     activeView: String,
     darkMode: Boolean,
-    aurEnabled: Boolean
+    aurEnabled: Boolean,
+    collapsed: Boolean
   },
   computed: {
     packageItems() {
       const items = [
+        {
+          id: 'dashboard',
+          label: 'Dashboard',
+          icon: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" /></svg>'
+        },
         {
           id: 'installed',
           label: 'Installed',

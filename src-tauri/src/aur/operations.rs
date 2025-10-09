@@ -1,6 +1,10 @@
-use crate::models::PackageInfo;
+use crate::models::{PackageInfo, CommandResult};
 use crate::utils::is_command_available;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::io::{BufRead, BufReader};
+use tauri::Window;
+use tokio;
+use serde_json;
 
 /// Get package information from AUR
 pub fn get_aur_package_info(package: &str, helper: &str) -> Result<String, String> {
@@ -198,7 +202,7 @@ pub fn install_aur_with_options(package: &str, helper: &str, options: Vec<String
         return Err(format!("{} is not installed", helper_cmd));
     }
 
-    let mut args = vec!["-S", package];
+    let mut args = vec!["-S", "--needed", "--noconfirm", package];
     for option in &options {
         args.push(option);
     }
@@ -214,5 +218,97 @@ pub fn install_aur_with_options(package: &str, helper: &str, options: Vec<String
     } else {
         Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
+}
+
+/// Install an AUR package asynchronously with real-time output
+pub async fn install_aur_package_async(window: Window, package: String) -> Result<CommandResult, String> {
+    let pkg_clone = package.clone();
+    let helper = "yay".to_string();
+
+    tokio::spawn(async move {
+        let helper_cmd = match helper.as_str() {
+            "yay" => "yay",
+            "paru" => "paru",
+            _ => {
+                let _ = window.emit(
+                    "install-complete",
+                    serde_json::json!({
+                        "success": false,
+                        "message": "✗ Invalid AUR helper specified"
+                    })
+                );
+                return;
+            }
+        };
+
+        if !is_command_available(helper_cmd) {
+            let _ = window.emit(
+                "install-complete",
+                serde_json::json!({
+                    "success": false,
+                    "message": format!("✗ {} is not installed", helper_cmd)
+                })
+            );
+            return;
+        }
+
+        let child = Command::new("/usr/bin/pkexec")
+            .args(&[format!("/usr/bin/{}", helper_cmd), "-S".to_string(), "--needed".to_string(), "--noconfirm".to_string(), pkg_clone.clone()])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn();
+
+        match child {
+            Ok(mut child_process) => {
+                // Handle stdout
+                if let Some(stdout) = child_process.stdout.take() {
+                    let reader = BufReader::new(stdout);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            let _ = window.emit("install-output", line);
+                        }
+                    }
+                }
+
+                // Handle stderr
+                if let Some(stderr) = child_process.stderr.take() {
+                    let reader = BufReader::new(stderr);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            let _ = window.emit("install-output", format!("ERROR: {}", line));
+                        }
+                    }
+                }
+
+                let result = child_process.wait().expect("Failed to wait for AUR install");
+
+                let success = result.success();
+                let message = if success {
+                    format!("✓ Installation of {} completed successfully!", pkg_clone)
+                } else {
+                    format!("✗ Installation of {} failed!", pkg_clone)
+                };
+
+                let _ = window.emit(
+                    "install-complete",
+                    serde_json::json!({
+                        "success": success,
+                        "message": message
+                    })
+                );
+            }
+            Err(_) => {
+                let _ = window.emit(
+                    "install-complete",
+                    serde_json::json!({
+                        "success": false,
+                        "message": format!("✗ Failed to start AUR installation for {}", pkg_clone)
+                    })
+                );
+            }
+        }
+    });
+
+    Ok(CommandResult::success(format!("AUR installation of {} started", package)))
 }
 
