@@ -47,10 +47,6 @@ The interface updates in real-time. When you're installing something, you see th
 
 ## Screenshots
 
-<video width="800" autoplay loop muted>
-  <source src="screenshots/video.mp4" type="video/mp4">
-</video>
-
 <div align="center">
 
 <img src="screenshots/Screenshot_20251010_050722.png" alt="GuiMan Dashboard" width="800">
