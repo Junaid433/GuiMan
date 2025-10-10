@@ -48,7 +48,7 @@ The interface updates in real-time. When you're installing something, you see th
 ## Screenshots
 
 <video width="800" autoplay loop muted>
-  <source src="screenshots/video.webm" type="video/webm">
+  <source src="screenshots/Screencast_20251010_051232 (online-video-cutter.com).mp4" type="video/webm">
 </video>
 
 <div align="center">
