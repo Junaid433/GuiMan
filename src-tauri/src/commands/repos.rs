@@ -132,7 +132,7 @@ pub async fn get_repo_packages(repo: String) -> Result<Vec<crate::models::Packag
 #[tauri::command]
 pub async fn sync_databases() -> Result<String, String> {
     let output = Command::new("/usr/bin/pkexec")
-        .args(&["pacman", "-Sy"])
+        .args(&["pacman", "-Syu"])
         .output()
         .map_err(|e| format!("Failed to sync databases: {}", e))?;
 
