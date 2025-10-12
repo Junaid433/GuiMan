@@ -68,7 +68,20 @@ pub async fn install_package(window: Window, pkg: String) -> Result<CommandResul
 
 #[tauri::command]
 pub async fn remove_package(window: Window, pkg: String) -> Result<CommandResult, String> {
-    pacman::remove_package_async(window, pkg).await
+    // Check if package exists in official repositories
+    let is_official = Command::new("/usr/bin/pacman")
+        .args(["-Si", &pkg])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+
+    if is_official {
+        // Use pacman for official packages
+        pacman::remove_package_async(window, pkg).await
+    } else {
+        // Use AUR helper for AUR packages - we need to create this function
+        aur::remove_aur_package_async(window, pkg).await
+    }
 }
 
 // AUR Advanced Features

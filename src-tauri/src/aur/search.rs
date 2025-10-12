@@ -50,7 +50,7 @@ pub fn search_aur(
                     } else {
                         "unknown".to_string()
                     };
-                    let installed = line.contains("[installed]");
+                    let installed = line.to_lowercase().contains("[installed]") || line.contains("(Installed)");
 
                     if let Some(score) = matcher.fuzzy_match(name, query) {
                         let description = if i + 1 < lines.len() {

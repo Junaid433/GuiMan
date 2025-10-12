@@ -997,7 +997,7 @@ export default {
         logs.value.push(event.payload)
       })
 
-      listen('install-complete', (event) => {
+      listen('install-complete', async (event) => {
         operationCompleted.value = true
         operationSuccess.value = event.payload.success
         logs.value.push(event.payload.message)
@@ -1005,6 +1005,8 @@ export default {
           sendNotif('success', 'Installation Complete', event.payload.message, {
             actions: [{ label: 'View Logs', action: 'view-logs' }]
           })
+          // Refresh the current view to show newly installed packages
+          await handleViewChange(activeView.value)
         } else {
           sendNotif('error', 'Installation Failed', event.payload.message, {
             actions: [{ label: 'View Logs', action: 'view-logs', primary: true }]
@@ -1012,7 +1014,7 @@ export default {
         }
       })
 
-      listen('remove-complete', (event) => {
+      listen('remove-complete', async (event) => {
         operationCompleted.value = true
         operationSuccess.value = event.payload.success
         logs.value.push(event.payload.message)
@@ -1020,6 +1022,8 @@ export default {
           sendNotif('success', 'Removal Complete', event.payload.message, {
             actions: [{ label: 'View Logs', action: 'view-logs' }]
           })
+          // Refresh the current view to update package status
+          await handleViewChange(activeView.value)
         } else {
           sendNotif('error', 'Removal Failed', event.payload.message, {
             actions: [{ label: 'View Logs', action: 'view-logs', primary: true }]
@@ -1027,7 +1031,7 @@ export default {
         }
       })
 
-      listen('update-complete', (event) => {
+      listen('update-complete', async (event) => {
         operationCompleted.value = true
         operationSuccess.value = event.payload.success
         logs.value.push(event.payload.message)
@@ -1035,6 +1039,8 @@ export default {
           sendNotif('success', 'System Update Complete', event.payload.message, {
             actions: [{ label: 'View Logs', action: 'view-logs' }]
           })
+          // Refresh the current view to update package statuses
+          await handleViewChange(activeView.value)
         } else {
           sendNotif('error', 'System Update Failed', event.payload.message, {
             actions: [{ label: 'View Logs', action: 'view-logs', primary: true }]

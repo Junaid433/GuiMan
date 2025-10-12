@@ -29,7 +29,14 @@ pub async fn install_package_async(window: Window, package: String) -> Result<Co
         if let Some(stdout) = child.stdout.take() {
             let reader = BufReader::new(stdout);
             for line in reader.lines().map_while(Result::ok) {
-                let _ = window.emit("install-output", line);
+                let _ = window.emit("install-log", line);
+            }
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines().map_while(Result::ok) {
+                let _ = window.emit("install-log", format!("ERROR: {}", line));
             }
         }
 
@@ -90,7 +97,14 @@ pub async fn remove_package_async(window: Window, package: String) -> Result<Com
         if let Some(stdout) = child.stdout.take() {
             let reader = BufReader::new(stdout);
             for line in reader.lines().map_while(Result::ok) {
-                let _ = window.emit("remove-output", line);
+                let _ = window.emit("remove-log", line);
+            }
+        }
+
+        if let Some(stderr) = child.stderr.take() {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines().map_while(Result::ok) {
+                let _ = window.emit("remove-log", format!("ERROR: {}", line));
             }
         }
 
@@ -137,19 +151,33 @@ pub async fn update_system_async(window: Window) -> Result<CommandResult, String
 
         match child {
             Ok(mut upgrade_child) => {
-                if let Some(stdout) = upgrade_child.stdout.take() {
-                    let reader = BufReader::new(stdout);
-                    for line in reader.lines().map_while(Result::ok) {
-                        let _ = window.emit("update-output", line);
-                    }
-                }
+                // Take the handles first
+                let stdout = upgrade_child.stdout.take();
+                let stderr = upgrade_child.stderr.take();
 
-                if let Some(stderr) = upgrade_child.stderr.take() {
-                    let reader = BufReader::new(stderr);
-                    for line in reader.lines().map_while(Result::ok) {
-                        let _ = window.emit("update-output", format!("ERROR: {}", line));
+                // Stream stdout and stderr concurrently
+                let window_clone1 = window.clone();
+                let window_clone2 = window.clone();
+                let stdout_handle = tokio::spawn(async move {
+                    if let Some(stdout) = stdout {
+                        let reader = BufReader::new(stdout);
+                        for line in reader.lines().map_while(Result::ok) {
+                            let _ = window_clone1.emit("update-log", line);
+                        }
                     }
-                }
+                });
+
+                let stderr_handle = tokio::spawn(async move {
+                    if let Some(stderr) = stderr {
+                        let reader = BufReader::new(stderr);
+                        for line in reader.lines().map_while(Result::ok) {
+                            let _ = window_clone2.emit("update-log", format!("ERROR: {}", line));
+                        }
+                    }
+                });
+
+                // Wait for both streaming tasks to complete
+                let _ = tokio::join!(stdout_handle, stderr_handle);
 
                 let result = match upgrade_child.wait() {
                     Ok(result) => result,
@@ -194,68 +222,83 @@ pub async fn update_system_async(window: Window) -> Result<CommandResult, String
 /// Clean package cache
 pub async fn clean_cache_async(window: Window, aur_helper: Option<String>) -> Result<CommandResult, String> {
     let helper = aur_helper.unwrap_or_else(|| "yay".to_string());
-    
+
     tokio::spawn(async move {
-        let _ = window.emit("cache-clean-output", "Cleaning pacman cache...");
-        
-        let _ = window.emit("cache-clean-output", "Checking if pacman database is available...");
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-        
+        // Remove database lock if it exists
         let _ = Command::new("/bin/sh")
             .args(["-c", "/usr/bin/pkexec rm -f /var/lib/pacman/db.lck 2>/dev/null || true"])
             .output();
-        
-        let _ = window.emit("cache-clean-output", "Starting cache clean...");
-        
-        let pacman_result = match Command::new("/bin/sh")
-            .args(["-c", "printf 'y\\ny\\n' | /usr/bin/pkexec /usr/bin/pacman -Scc 2>&1"])
-            .output() {
-            Ok(result) => result,
-            Err(e) => {
-                let _ = window.emit("cache-clean-complete", serde_json::json!({
-                    "success": false,
-                    "message": format!("Failed to start cache clean: {}", e)
-                }));
-                return;
-            }
-        };
 
-        let stdout_str = String::from_utf8_lossy(&pacman_result.stdout);
-        for line in stdout_str.lines() {
-            if !line.trim().is_empty() && line != "y" {
-                let _ = window.emit("cache-clean-output", line);
+        // Clean pacman cache with real-time output
+        let pacman_child = Command::new("/usr/bin/pkexec")
+            .args(["/usr/bin/pacman", "-Scc", "--noconfirm"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn();
+
+        let mut pacman_success = false;
+        if let Ok(mut child) = pacman_child {
+            // Stream stdout
+            if let Some(stdout) = child.stdout.take() {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines().map_while(Result::ok) {
+                    let _ = window.emit("cache-clean-output", line);
+                }
+            }
+
+            // Stream stderr
+            if let Some(stderr) = child.stderr.take() {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines().map_while(Result::ok) {
+                    let _ = window.emit("cache-clean-output", format!("ERROR: {}", line));
+                }
+            }
+
+            if let Ok(result) = child.wait() {
+                pacman_success = result.success();
             }
         }
-        
-        let pacman_success = pacman_result.status.success();
-        
+
         let helper_cmd = match helper.as_str() {
             "paru" => "paru",
             _ => "yay",
         };
-        
-        let _ = window.emit("cache-clean-output", format!("\nCleaning {} cache...", helper_cmd));
-        
-        let aur_result = Command::new("/bin/sh")
-            .args(["-c", &format!("timeout 10 /bin/sh -c 'printf \"y\\ny\\n\" | /usr/bin/pkexec {} -Scc' 2>&1 || echo 'Cache clean completed or timed out'", helper_cmd)])
-            .output();
-        
+
+        // Clean AUR helper cache with real-time output
+        let aur_child = Command::new(format!("/usr/bin/{}", helper_cmd))
+            .args(["-Scc", "--noconfirm"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn();
+
         let mut aur_success = false;
-        if let Ok(output) = aur_result {
-            aur_success = output.status.success();
-            let stdout_str = String::from_utf8_lossy(&output.stdout);
-            for line in stdout_str.lines() {
-                if !line.trim().is_empty() && line != "y" {
+        if let Ok(mut child) = aur_child {
+            // Stream stdout
+            if let Some(stdout) = child.stdout.take() {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines().map_while(Result::ok) {
                     let _ = window.emit("cache-clean-output", line);
                 }
             }
+
+            // Stream stderr
+            if let Some(stderr) = child.stderr.take() {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines().map_while(Result::ok) {
+                    let _ = window.emit("cache-clean-output", format!("ERROR: {}", line));
+                }
+            }
+
+            if let Ok(result) = child.wait() {
+                aur_success = result.success();
+            }
         }
-        
+
         let (success, final_message) = match (pacman_success, aur_success) {
             (true, true) => (true, "✓ Cache cleaned successfully!".to_string()),
-            (true, false) => (true, "✓ Pacman cache cleaned, but AUR helper cache cleaning failed or timed out".to_string()),
-            (false, true) => (false, "⚠ Pacman cache cleaning failed (database might be locked), but AUR cache cleaned".to_string()),
-            (false, false) => (false, "✗ Cache cleaning failed! Make sure no other package manager is running.".to_string()),
+            (true, false) => (true, "✓ Pacman cache cleaned, but AUR helper cache cleaning failed".to_string()),
+            (false, true) => (false, "⚠ Pacman cache cleaning failed, but AUR cache cleaned".to_string()),
+            (false, false) => (false, "✗ Cache cleaning failed!".to_string()),
         };
 
         let _ = window.emit("cache-clean-complete", serde_json::json!({

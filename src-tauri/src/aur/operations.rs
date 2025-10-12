@@ -55,7 +55,7 @@ pub fn list_aur_packages(helper: &str) -> Result<Vec<PackageInfo>, String> {
         if parts.len() >= 3 {
             let name = parts[1];
             let version = parts[2];
-            let installed = line.contains("[installed]");
+            let installed = line.to_lowercase().contains("[installed]") || line.contains("(Installed)");
 
             packages.push(PackageInfo {
                 name: name.to_string(),
@@ -207,8 +207,7 @@ pub fn install_aur_with_options(package: &str, helper: &str, options: Vec<String
         args.push(option);
     }
 
-    let output = Command::new("/usr/bin/pkexec")
-        .arg(format!("/usr/bin/{}", helper_cmd))
+    let output = Command::new(format!("/usr/bin/{}", helper_cmd))
         .args(&args)
         .output()
         .map_err(|e| format!("Failed to install with options: {}", e))?;
@@ -252,8 +251,8 @@ pub async fn install_aur_package_async(window: Window, package: String) -> Resul
             return;
         }
 
-        let child = Command::new("/usr/bin/pkexec")
-            .args([format!("/usr/bin/{}", helper_cmd), "-S".to_string(), "--needed".to_string(), "--noconfirm".to_string(), pkg_clone.clone()])
+        let child = Command::new(format!("/usr/bin/{}", helper_cmd))
+            .args(["-S", "--needed", "--noconfirm", &pkg_clone])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn();
@@ -264,7 +263,7 @@ pub async fn install_aur_package_async(window: Window, package: String) -> Resul
                 if let Some(stdout) = child_process.stdout.take() {
                     let reader = BufReader::new(stdout);
                     for line in reader.lines().map_while(Result::ok) {
-                        let _ = window.emit("install-output", line);
+                        let _ = window.emit("install-log", line);
                     }
                 }
 
@@ -272,7 +271,7 @@ pub async fn install_aur_package_async(window: Window, package: String) -> Resul
                 if let Some(stderr) = child_process.stderr.take() {
                     let reader = BufReader::new(stderr);
                     for line in reader.lines().map_while(Result::ok) {
-                        let _ = window.emit("install-output", format!("ERROR: {}", line));
+                        let _ = window.emit("install-log", format!("ERROR: {}", line));
                     }
                 }
 
@@ -315,5 +314,102 @@ pub async fn install_aur_package_async(window: Window, package: String) -> Resul
     });
 
     Ok(CommandResult::success(format!("AUR installation of {} started", package)))
+}
+
+/// Remove an AUR package asynchronously with real-time output
+pub async fn remove_aur_package_async(window: Window, package: String) -> Result<CommandResult, String> {
+    let pkg_clone = package.clone();
+    let helper = "yay".to_string();
+
+    tokio::spawn(async move {
+        let helper_cmd = match helper.as_str() {
+            "yay" => "yay",
+            "paru" => "paru",
+            _ => {
+                let _ = window.emit(
+                    "remove-complete",
+                    serde_json::json!({
+                        "success": false,
+                        "message": "✗ Invalid AUR helper specified"
+                    })
+                );
+                return;
+            }
+        };
+
+        if !is_command_available(helper_cmd) {
+            let _ = window.emit(
+                "remove-complete",
+                serde_json::json!({
+                    "success": false,
+                    "message": format!("✗ {} is not installed", helper_cmd)
+                })
+            );
+            return;
+        }
+
+        let child = Command::new(format!("/usr/bin/{}", helper_cmd))
+            .args(["-R", "--noconfirm", &pkg_clone])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn();
+
+        match child {
+            Ok(mut child_process) => {
+                // Handle stdout
+                if let Some(stdout) = child_process.stdout.take() {
+                    let reader = BufReader::new(stdout);
+                    for line in reader.lines().map_while(Result::ok) {
+                        let _ = window.emit("remove-log", line);
+                    }
+                }
+
+                // Handle stderr
+                if let Some(stderr) = child_process.stderr.take() {
+                    let reader = BufReader::new(stderr);
+                    for line in reader.lines().map_while(Result::ok) {
+                        let _ = window.emit("remove-log", format!("ERROR: {}", line));
+                    }
+                }
+
+                let result = match child_process.wait() {
+                    Ok(result) => result,
+                    Err(e) => {
+                        let _ = window.emit("remove-complete", serde_json::json!({
+                            "success": false,
+                            "message": format!("Failed to wait for AUR remove process: {}", e)
+                        }));
+                        return;
+                    }
+                };
+
+                let success = result.success();
+                let message = if success {
+                    format!("✓ Removal of {} completed successfully!", pkg_clone)
+                } else {
+                    format!("✗ Removal of {} failed!", pkg_clone)
+                };
+
+                let _ = window.emit(
+                    "remove-complete",
+                    serde_json::json!({
+                        "success": success,
+                        "message": message
+                    })
+                );
+            }
+            Err(_) => {
+                let _ = window.emit(
+                    "remove-complete",
+                    serde_json::json!({
+                        "success": false,
+                        "message": format!("✗ Failed to start AUR removal for {}", pkg_clone)
+                    })
+                );
+            }
+        }
+    });
+
+    Ok(CommandResult::success(format!("AUR removal of {} started", package)))
 }
 
