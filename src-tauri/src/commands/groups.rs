@@ -14,7 +14,7 @@ pub struct PackageGroup {
 pub async fn list_groups() -> Result<Vec<PackageGroup>, String> {
     // Get list of group names
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Sg"])
+        .args(["-Sg"])
         .output()
         .map_err(|e| format!("Failed to execute pacman -Sg: {}", e))?;
 
@@ -43,7 +43,7 @@ pub async fn list_groups() -> Result<Vec<PackageGroup>, String> {
     
     for group_name in &group_names {
         let group_output = Command::new("/usr/bin/pacman")
-            .args(&["-Sg", group_name])
+            .args(["-Sg", group_name])
             .output()
             .map_err(|e| format!("Failed to get packages for group {}: {}", group_name, e))?;
         
@@ -67,7 +67,7 @@ pub async fn list_groups() -> Result<Vec<PackageGroup>, String> {
 
     // Get installed packages
     let installed_output = Command::new("/usr/bin/pacman")
-        .args(&["-Q"])
+        .args(["-Q"])
         .output()
         .map_err(|e| format!("Failed to get installed packages: {}", e))?;
 
@@ -100,7 +100,7 @@ pub async fn list_groups() -> Result<Vec<PackageGroup>, String> {
 #[tauri::command]
 pub async fn get_group_packages(group: String) -> Result<Vec<PackageInfo>, String> {
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Sg", &group])
+        .args(["-Sg", &group])
         .output()
         .map_err(|e| format!("Failed to get group packages: {}", e))?;
 
@@ -119,7 +119,7 @@ pub async fn get_group_packages(group: String) -> Result<Vec<PackageInfo>, Strin
 
     // Get installed status
     let installed_output = Command::new("/usr/bin/pacman")
-        .args(&["-Q"])
+        .args(["-Q"])
         .output()
         .map_err(|e| format!("Failed to get installed packages: {}", e))?;
 

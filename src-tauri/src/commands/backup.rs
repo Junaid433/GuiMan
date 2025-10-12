@@ -35,7 +35,7 @@ pub async fn create_package_backup(name: String, description: String) -> Result<
     
     // Get explicit packages (user-installed)
     let explicit_output = Command::new("/usr/bin/pacman")
-        .args(&["-Qe"])
+        .args(["-Qe"])
         .output()
         .map_err(|e| format!("Failed to get explicit packages: {}", e))?;
     
@@ -53,7 +53,7 @@ pub async fn create_package_backup(name: String, description: String) -> Result<
     let mut aur_packages = Vec::new();
     for package in &explicit_packages {
         let output = Command::new("/usr/bin/pacman")
-            .args(&["-Qi", package])
+            .args(["-Qi", package])
             .output();
         
         if let Ok(output) = output {
@@ -158,7 +158,7 @@ pub async fn restore_package_backup(backup_name: String, install_missing: bool, 
     if install_missing {
         // Get currently installed explicit packages
         let current_output = Command::new("/usr/bin/pacman")
-            .args(&["-Qe"])
+            .args(["-Qe"])
             .output()
             .map_err(|e| format!("Failed to get current packages: {}", e))?;
         
@@ -185,7 +185,7 @@ pub async fn restore_package_backup(backup_name: String, install_missing: bool, 
         if !missing_official.is_empty() {
             let install_cmd = format!("pkexec pacman -S --needed --noconfirm {}", missing_official.join(" "));
             let output = Command::new("/bin/sh")
-                .args(&["-c", &install_cmd])
+                .args(["-c", &install_cmd])
                 .output()
                 .map_err(|e| format!("Failed to install official packages: {}", e))?;
             
@@ -201,7 +201,7 @@ pub async fn restore_package_backup(backup_name: String, install_missing: bool, 
             let aur_helper = get_aur_helper().unwrap_or("yay".to_string());
             let install_cmd = format!("{} -S --needed --noconfirm {}", aur_helper, missing_aur.join(" "));
             let output = Command::new("/bin/sh")
-                .args(&["-c", &install_cmd])
+                .args(["-c", &install_cmd])
                 .output()
                 .map_err(|e| format!("Failed to install AUR packages: {}", e))?;
             
@@ -259,14 +259,12 @@ pub async fn list_pacman_hooks() -> Result<Vec<PackageHook>, String> {
     
     for hook_dir in &hook_dirs {
         if let Ok(entries) = fs::read_dir(hook_dir) {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let path = entry.path();
-                    if path.extension().and_then(|s| s.to_str()) == Some("hook") {
-                        if let Ok(content) = fs::read_to_string(&path) {
-                            let hook = parse_hook_file(&path.to_string_lossy(), &content);
-                            hooks.push(hook);
-                        }
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("hook") {
+                    if let Ok(content) = fs::read_to_string(&path) {
+                        let hook = parse_hook_file(&path.to_string_lossy(), &content);
+                        hooks.push(hook);
                     }
                 }
             }
@@ -281,7 +279,7 @@ pub async fn list_pacman_hooks() -> Result<Vec<PackageHook>, String> {
 #[tauri::command]
 pub async fn export_packages(format: String) -> Result<String, String> {
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Qe"])
+        .args(["-Qe"])
         .output()
         .map_err(|e| format!("Failed to get package list: {}", e))?;
     
@@ -315,15 +313,15 @@ pub async fn export_packages(format: String) -> Result<String, String> {
 
 fn get_backup_directory() -> Result<String, String> {
     let home = std::env::var("HOME")
-        .map_err(|_| "Failed to get HOME directory".to_string())?;
+        .map_err(|_| "Failed to determine backup directory: HOME environment variable not set".to_string())?;
     Ok(format!("{}/.config/guiman/backups", home))
 }
 
 async fn is_aur_package(package: &str) -> bool {
     let aur_helpers = ["yay", "paru"];
     for helper in &aur_helpers {
-        let output = Command::new(&format!("/usr/bin/{}", helper))
-            .args(&["-Si", package])
+        let output = Command::new(format!("/usr/bin/{}", helper))
+            .args(["-Si", package])
             .output();
         
         if let Ok(output) = output {

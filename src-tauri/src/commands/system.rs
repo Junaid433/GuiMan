@@ -28,10 +28,14 @@ pub async fn get_cache_size() -> Result<serde_json::Value, String> {
         .join(".cache/yay");
     
     let yay_size = if yay_cache_path.exists() {
-        let output = Command::new("/usr/bin/du")
-            .args(&["-sh", yay_cache_path.to_str().unwrap()])
-            .output()
-            .ok();
+        let output = if let Some(path_str) = yay_cache_path.to_str() {
+            Command::new("/usr/bin/du")
+                .args(["-sh", path_str])
+                .output()
+                .ok()
+        } else {
+            None
+        };
         
         if let Some(out) = output {
             String::from_utf8_lossy(&out.stdout)
@@ -102,7 +106,7 @@ pub async fn get_popular_packages() -> Result<Vec<crate::models::PackageInfo>, S
 
     for pkg_name in selected {
         let output = Command::new("/usr/bin/pacman")
-            .args(&["-Ss", &format!("^{}$", pkg_name)])
+            .args(["-Ss", &format!("^{}$", pkg_name)])
             .output()
             .ok();
 
@@ -157,7 +161,7 @@ pub async fn install_polkit_policy() -> Result<CommandResult, String> {
     };
 
     let output = Command::new("/usr/bin/pkexec")
-        .args(&["cp", policy_source, "/usr/share/polkit-1/actions/"])
+        .args(["cp", policy_source, "/usr/share/polkit-1/actions/"])
         .output()
         .map_err(|e| format!("Failed to install polkit policy: {}", e))?;
 

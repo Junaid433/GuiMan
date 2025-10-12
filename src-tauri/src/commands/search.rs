@@ -18,7 +18,7 @@ pub async fn search_package(
 
     // Search official repositories
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Sl"])
+        .args(["-Sl"])
         .output()
         .map_err(|e| format!("Failed to execute pacman: {}", e))?;
 
@@ -82,7 +82,7 @@ fn enrich_package_descriptions(packages: &mut [PackageInfo]) -> Result<(), Strin
     }
 
     let info_output = Command::new("/usr/bin/pacman")
-        .args(&["-Si"])
+        .args(["-Si"])
         .args(&official_packages)
         .output()
         .ok();

@@ -16,6 +16,15 @@ pub struct CommandResult {
     pub data: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Clone)]
+pub struct PackageDependencyInfo {
+    pub dependencies: Vec<String>,
+    pub optional_dependencies: Vec<String>,
+    pub version: String,
+    pub repository: String,
+    pub installed: bool,
+}
+
 impl CommandResult {
     pub fn success(message: String) -> Self {
         Self {

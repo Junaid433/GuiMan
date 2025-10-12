@@ -274,7 +274,10 @@ pub async fn set_auto_update(enabled: bool) -> Result<(), String> {
         "last_check": chrono::Utc::now().to_rfc3339()
     });
     
-    fs::write(&config_file, serde_json::to_string_pretty(&config).unwrap())
+    let config_json = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize updater config: {}", e))?;
+
+    fs::write(&config_file, config_json)
         .map_err(|e| format!("Failed to save updater config: {}", e))?;
     
     Ok(())

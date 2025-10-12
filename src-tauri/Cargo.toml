@@ -29,6 +29,8 @@ tauri = { version = "1.5", features = [
     "window-hide",
     "shell-open"
 ] }
+thiserror = "1.0"
+anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
 regex = "1.10"
 rand = "0.8"

@@ -52,7 +52,7 @@ pub async fn list_aur_packages(helper: String) -> Result<Vec<PackageInfo>, Strin
 pub async fn install_package(window: Window, pkg: String) -> Result<CommandResult, String> {
     // Check if package exists in official repositories
     let is_official = Command::new("/usr/bin/pacman")
-        .args(&["-Si", &pkg])
+        .args(["-Si", &pkg])
         .output()
         .map(|output| output.status.success())
         .unwrap_or(false);
