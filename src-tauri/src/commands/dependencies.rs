@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::collections::{HashMap, HashSet};
+use crate::error::{GuiManError, Result};
+use crate::models::PackageDependencyInfo;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DependencyNode {
@@ -23,7 +25,7 @@ pub struct DependencyGraph {
 
 /// Get dependency tree for a package
 #[tauri::command]
-pub async fn get_dependency_tree(package: String, max_depth: Option<usize>) -> Result<DependencyGraph, String> {
+pub async fn get_dependency_tree(package: String, max_depth: Option<usize>) -> std::result::Result<DependencyGraph, String> {
     println!("Getting dependency tree for: {}", package);
     let max_depth = max_depth.unwrap_or(2); // Reduced default depth
     let mut graph = DependencyGraph {
@@ -47,7 +49,7 @@ pub async fn get_dependency_tree(package: String, max_depth: Option<usize>) -> R
 
 /// Get reverse dependency tree (what depends on this package)
 #[tauri::command]
-pub async fn get_reverse_dependency_tree(package: String, max_depth: Option<usize>) -> Result<DependencyGraph, String> {
+pub async fn get_reverse_dependency_tree(package: String, max_depth: Option<usize>) -> std::result::Result<DependencyGraph, String> {
     let max_depth = max_depth.unwrap_or(2); // Reduced default depth
     let mut graph = DependencyGraph {
         root: package.clone(),
@@ -67,7 +69,7 @@ fn build_dependency_tree(
     max_depth: usize,
     nodes: &mut HashMap<String, DependencyNode>,
     visited: &mut HashSet<String>,
-) -> Result<(), String> {
+) -> std::result::Result<(), String> {
     // Prevent runaway processing
     if level > max_depth || visited.contains(package) || nodes.len() > 50 {
         return Ok(());
@@ -76,19 +78,18 @@ fn build_dependency_tree(
     visited.insert(package.to_string());
     
     // Try to get package info - first from installed packages, then from repos, then from AUR
-    let (dependencies, optional_deps, version, repo, installed) = 
-        get_package_info_for_deps(package)?;
-    
+    let pkg_info = get_package_info_for_deps(package)?;
+
     // Get what requires this package (only works for installed packages)
     let required_by = get_required_by(package).unwrap_or_default();
-    
+
     let node = DependencyNode {
         name: package.to_string(),
-        version,
-        repo,
-        installed,
-        dependencies: dependencies.clone(),
-        optional_deps: optional_deps.clone(),
+        version: pkg_info.version,
+        repo: pkg_info.repository,
+        installed: pkg_info.installed,
+        dependencies: pkg_info.dependencies.clone(),
+        optional_deps: pkg_info.optional_dependencies.clone(),
         required_by,
         level,
     };
@@ -96,8 +97,8 @@ fn build_dependency_tree(
     nodes.insert(package.to_string(), node);
     
     // Recursively build dependency tree
-    for dep in dependencies {
-        let dep_name = clean_dependency_name(&dep);
+    for dep in &pkg_info.dependencies {
+        let dep_name = clean_dependency_name(dep);
         if let Err(e) = build_dependency_tree(&dep_name, level + 1, max_depth, nodes, visited) {
             println!("Warning: Failed to build dependency tree for {}: {}", dep_name, e);
             // Continue with other dependencies instead of failing completely
@@ -113,7 +114,7 @@ fn build_reverse_dependency_tree(
     max_depth: usize,
     nodes: &mut HashMap<String, DependencyNode>,
     visited: &mut HashSet<String>,
-) -> Result<(), String> {
+) -> std::result::Result<(), String> {
     // Prevent runaway processing
     if level > max_depth || visited.contains(package) || nodes.len() > 50 {
         return Ok(());
@@ -122,18 +123,17 @@ fn build_reverse_dependency_tree(
     visited.insert(package.to_string());
     
     // Try to get package info - first from installed packages, then from repos, then from AUR
-    let (dependencies, optional_deps, version, repo, installed) = 
-        get_package_info_for_deps(package)?;
-    
+    let pkg_info = get_package_info_for_deps(package)?;
+
     let required_by = get_required_by(package).unwrap_or_default();
-    
+
     let node = DependencyNode {
         name: package.to_string(),
-        version,
-        repo,
-        installed,
-        dependencies,
-        optional_deps,
+        version: pkg_info.version,
+        repo: pkg_info.repository,
+        installed: pkg_info.installed,
+        dependencies: pkg_info.dependencies,
+        optional_deps: pkg_info.optional_dependencies,
         required_by: required_by.clone(),
         level,
     };
@@ -215,9 +215,9 @@ fn extract_field(output: &str, field: &str) -> String {
     "Unknown".to_string()
 }
 
-fn get_required_by(package: &str) -> Result<Vec<String>, String> {
+fn get_required_by(package: &str) -> std::result::Result<Vec<String>, String> {
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Qi", package])
+        .args(["-Qi", package])
         .output()
         .map_err(|e| format!("Failed to get required by: {}", e))?;
     
@@ -243,12 +243,12 @@ fn get_required_by(package: &str) -> Result<Vec<String>, String> {
     Ok(Vec::new())
 }
 
-fn get_package_info_for_deps(package: &str) -> Result<(Vec<String>, Vec<String>, String, String, bool), String> {
+fn get_package_info_for_deps(package: &str) -> Result<PackageDependencyInfo> {
     // println!("Getting package info for: {}", package); // Commented out to reduce spam
     
     // Try installed packages first
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Qi", package])
+        .args(["-Qi", package])
         .output();
     
     if let Ok(output) = output {
@@ -259,13 +259,19 @@ fn get_package_info_for_deps(package: &str) -> Result<(Vec<String>, Vec<String>,
             let opt_deps = extract_optional_dependencies(&stdout);
             let version = extract_field(&stdout, "Version");
             let repo = extract_field(&stdout, "Repository");
-            return Ok((deps, opt_deps, version, repo, true));
+            return Ok(PackageDependencyInfo {
+                dependencies: deps,
+                optional_dependencies: opt_deps,
+                version,
+                repository: repo,
+                installed: true,
+            });
         }
     }
     
     // Try repository packages
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Si", package])
+        .args(["-Si", package])
         .output();
     
     if let Ok(output) = output {
@@ -276,7 +282,13 @@ fn get_package_info_for_deps(package: &str) -> Result<(Vec<String>, Vec<String>,
             let opt_deps = extract_optional_dependencies(&stdout);
             let version = extract_field(&stdout, "Version");
             let repo = extract_field(&stdout, "Repository");
-            return Ok((deps, opt_deps, version, repo, false));
+            return Ok(PackageDependencyInfo {
+                dependencies: deps,
+                optional_dependencies: opt_deps,
+                version,
+                repository: repo,
+                installed: false,
+            });
         } else {
             println!("pacman -Si failed for {}: {}", package, String::from_utf8_lossy(&output.stderr));
         }
@@ -288,8 +300,8 @@ fn get_package_info_for_deps(package: &str) -> Result<(Vec<String>, Vec<String>,
     let aur_helpers = ["yay", "paru"];
     for helper in &aur_helpers {
         println!("Trying AUR helper: {} for package: {}", helper, package);
-        let output = Command::new(&format!("/usr/bin/{}", helper))
-            .args(&["-Si", package])
+        let output = Command::new(format!("/usr/bin/{}", helper))
+            .args(["-Si", package])
             .output();
         
         if let Ok(output) = output {
@@ -299,7 +311,13 @@ fn get_package_info_for_deps(package: &str) -> Result<(Vec<String>, Vec<String>,
                 let deps = extract_dependencies(&stdout);
                 let opt_deps = extract_optional_dependencies(&stdout);
                 let version = extract_field(&stdout, "Version");
-                return Ok((deps, opt_deps, version, "aur".to_string(), false));
+                return Ok(PackageDependencyInfo {
+                    dependencies: deps,
+                    optional_dependencies: opt_deps,
+                    version,
+                    repository: "aur".to_string(),
+                    installed: false,
+                });
             } else {
                 println!("{} -Si failed for {}: {}", helper, package, String::from_utf8_lossy(&output.stderr));
             }
@@ -308,7 +326,7 @@ fn get_package_info_for_deps(package: &str) -> Result<(Vec<String>, Vec<String>,
         }
     }
     
-    Err(format!("Package {} not found in any repository", package))
+    Err(GuiManError::PackageNotFound { package: package.to_string() })
 }
 
 fn clean_dependency_name(dep: &str) -> String {

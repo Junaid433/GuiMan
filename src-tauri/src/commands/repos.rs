@@ -14,7 +14,7 @@ pub struct Repository {
 pub async fn list_repositories() -> Result<Vec<Repository>, String> {
     // Get all repos from pacman -Sl
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Sl"])
+        .args(["-Sl"])
         .output()
         .map_err(|e| format!("Failed to list repositories: {}", e))?;
 
@@ -80,7 +80,7 @@ pub async fn list_repositories() -> Result<Vec<Repository>, String> {
 #[tauri::command]
 pub async fn get_repo_packages(repo: String) -> Result<Vec<crate::models::PackageInfo>, String> {
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Sl", &repo])
+        .args(["-Sl", &repo])
         .output()
         .map_err(|e| format!("Failed to get repository packages: {}", e))?;
 
@@ -92,7 +92,7 @@ pub async fn get_repo_packages(repo: String) -> Result<Vec<crate::models::Packag
     
     // Get installed packages
     let installed_output = Command::new("/usr/bin/pacman")
-        .args(&["-Q"])
+        .args(["-Q"])
         .output()
         .map_err(|e| format!("Failed to get installed packages: {}", e))?;
 
@@ -132,7 +132,7 @@ pub async fn get_repo_packages(repo: String) -> Result<Vec<crate::models::Packag
 #[tauri::command]
 pub async fn sync_databases() -> Result<String, String> {
     let output = Command::new("/usr/bin/pkexec")
-        .args(&["pacman", "-Syu"])
+        .args(["pacman", "-Syu"])
         .output()
         .map_err(|e| format!("Failed to sync databases: {}", e))?;
 
@@ -224,7 +224,7 @@ pub async fn update_mirrorlist(mirrors: Vec<MirrorInfo>) -> Result<String, Strin
 
     // Use pkexec to copy to system location
     let output = Command::new("/usr/bin/pkexec")
-        .args(&["cp", temp_path, "/etc/pacman.d/mirrorlist"])
+        .args(["cp", temp_path, "/etc/pacman.d/mirrorlist"])
         .output()
         .map_err(|e| format!("Failed to update mirrorlist: {}", e))?;
 

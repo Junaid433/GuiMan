@@ -1,4 +1,5 @@
 use crate::models::CommandResult;
+use crate::error::{GuiManError, Result};
 use crate::utils::create_command;
 use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
@@ -13,11 +14,13 @@ pub struct ExecutionResult {
 }
 
 /// Execute a command and return structured results
-pub fn execute_command(cmd: &str, args: &[&str]) -> Result<ExecutionResult, String> {
+pub fn execute_command(cmd: &str, args: &[&str]) -> Result<ExecutionResult> {
     let output = create_command(cmd)
         .args(args)
         .output()
-        .map_err(|e| format!("Failed to execute {}: {}", cmd, e))?;
+        .map_err(|e| GuiManError::CommandFailed {
+            command: format!("{} {}", cmd, args.join(" "))
+        })?;
 
     let stdout_lines: Vec<String> = String::from_utf8_lossy(&output.stdout)
         .lines()
@@ -87,7 +90,7 @@ where
 }
 
 /// Install a package (business logic only)
-pub async fn install_package(package: &str) -> Result<ExecutionResult, String> {
+pub async fn install_package(package: &str) -> Result<ExecutionResult> {
     execute_command_streaming(
         "/usr/bin/pkexec",
         &["/usr/bin/pacman", "-S", "--needed", "--noconfirm", package],
@@ -96,7 +99,7 @@ pub async fn install_package(package: &str) -> Result<ExecutionResult, String> {
 }
 
 /// Remove a package (business logic only)
-pub async fn remove_package(package: &str) -> Result<ExecutionResult, String> {
+pub async fn remove_package(package: &str) -> Result<ExecutionResult> {
     execute_command_streaming(
         "/usr/bin/pkexec",
         &["/usr/bin/pacman", "-Rs", "--noconfirm", package],
@@ -105,7 +108,7 @@ pub async fn remove_package(package: &str) -> Result<ExecutionResult, String> {
 }
 
 /// Update the system (business logic only)
-pub async fn update_system() -> Result<ExecutionResult, String> {
+pub async fn update_system() -> Result<ExecutionResult> {
     execute_command_streaming(
         "/usr/bin/pkexec",
         &["/usr/bin/pacman", "-Syu", "--needed", "--noconfirm"],
@@ -114,7 +117,7 @@ pub async fn update_system() -> Result<ExecutionResult, String> {
 }
 
 /// Clean package cache (business logic only)
-pub async fn clean_cache(aur_helper: Option<&str>) -> Result<ExecutionResult, String> {
+pub async fn clean_cache(aur_helper: Option<&str>) -> Result<ExecutionResult> {
     let helper = aur_helper.unwrap_or("yay");
     
     // Clean pacman cache

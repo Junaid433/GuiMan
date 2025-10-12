@@ -4,6 +4,7 @@
 )]
 
 // Module declarations
+mod error;
 mod models;
 mod utils;
 mod pacman;

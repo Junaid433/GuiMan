@@ -10,24 +10,39 @@ pub async fn install_package_async(window: Window, package: String) -> Result<Co
     let pkg_clone = package.clone();
     
     tokio::spawn(async move {
-        let mut child = Command::new("/usr/bin/pkexec")
+        let mut child = match Command::new("/usr/bin/pkexec")
             .arg("/usr/bin/pacman")
-            .args(&["-S", "--needed", "--noconfirm", &pkg_clone])
+            .args(["-S", "--needed", "--noconfirm", &pkg_clone])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .spawn()
-            .expect("Failed to start install process");
+            .spawn() {
+            Ok(child) => child,
+            Err(e) => {
+                let _ = window.emit("install-complete", serde_json::json!({
+                    "success": false,
+                    "message": format!("Failed to start install process: {}", e)
+                }));
+                return;
+            }
+        };
 
         if let Some(stdout) = child.stdout.take() {
             let reader = BufReader::new(stdout);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    let _ = window.emit("install-output", line);
-                }
+            for line in reader.lines().map_while(Result::ok) {
+                let _ = window.emit("install-output", line);
             }
         }
 
-        let result = child.wait().expect("Failed to wait for install");
+        let result = match child.wait() {
+            Ok(result) => result,
+            Err(e) => {
+                let _ = window.emit("install-complete", serde_json::json!({
+                    "success": false,
+                    "message": format!("Failed to wait for install process: {}", e)
+                }));
+                return;
+            }
+        };
 
         let success = result.success();
         let message = if success {
@@ -56,24 +71,39 @@ pub async fn remove_package_async(window: Window, package: String) -> Result<Com
     let pkg_clone = package.clone();
     
     tokio::spawn(async move {
-        let mut child = Command::new("/usr/bin/pkexec")
+        let mut child = match Command::new("/usr/bin/pkexec")
             .arg("/usr/bin/pacman")
-            .args(&["-Rs", "--noconfirm", &pkg_clone])
+            .args(["-Rs", "--noconfirm", &pkg_clone])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .spawn()
-            .expect("Failed to start remove process");
+            .spawn() {
+            Ok(child) => child,
+            Err(e) => {
+                let _ = window.emit("remove-complete", serde_json::json!({
+                    "success": false,
+                    "message": format!("Failed to start remove process: {}", e)
+                }));
+                return;
+            }
+        };
 
         if let Some(stdout) = child.stdout.take() {
             let reader = BufReader::new(stdout);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    let _ = window.emit("remove-output", line);
-                }
+            for line in reader.lines().map_while(Result::ok) {
+                let _ = window.emit("remove-output", line);
             }
         }
 
-        let result = child.wait().expect("Failed to wait for remove");
+        let result = match child.wait() {
+            Ok(result) => result,
+            Err(e) => {
+                let _ = window.emit("remove-complete", serde_json::json!({
+                    "success": false,
+                    "message": format!("Failed to wait for remove process: {}", e)
+                }));
+                return;
+            }
+        };
 
         let success = result.success();
         let message = if success {
@@ -100,7 +130,7 @@ pub async fn update_system_async(window: Window) -> Result<CommandResult, String
         // Use -Syu to avoid partial upgrade issues (sync and upgrade in one command)
         let child = Command::new("/usr/bin/pkexec")
             .arg("/usr/bin/pacman")
-            .args(&["-Syu", "--needed", "--noconfirm"])
+            .args(["-Syu", "--needed", "--noconfirm"])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn();
@@ -109,23 +139,28 @@ pub async fn update_system_async(window: Window) -> Result<CommandResult, String
             Ok(mut upgrade_child) => {
                 if let Some(stdout) = upgrade_child.stdout.take() {
                     let reader = BufReader::new(stdout);
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            let _ = window.emit("update-output", line);
-                        }
+                    for line in reader.lines().map_while(Result::ok) {
+                        let _ = window.emit("update-output", line);
                     }
                 }
 
                 if let Some(stderr) = upgrade_child.stderr.take() {
                     let reader = BufReader::new(stderr);
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            let _ = window.emit("update-output", format!("ERROR: {}", line));
-                        }
+                    for line in reader.lines().map_while(Result::ok) {
+                        let _ = window.emit("update-output", format!("ERROR: {}", line));
                     }
                 }
 
-                let result = upgrade_child.wait().expect("Failed to wait for update");
+                let result = match upgrade_child.wait() {
+                    Ok(result) => result,
+                    Err(e) => {
+                        let _ = window.emit("update-complete", serde_json::json!({
+                            "success": false,
+                            "message": format!("Failed to wait for update process: {}", e)
+                        }));
+                        return;
+                    }
+                };
 
                 let success = result.success();
                 let exit_code = result.code().unwrap_or(-1);
@@ -167,15 +202,23 @@ pub async fn clean_cache_async(window: Window, aur_helper: Option<String>) -> Re
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
         
         let _ = Command::new("/bin/sh")
-            .args(&["-c", "/usr/bin/pkexec rm -f /var/lib/pacman/db.lck 2>/dev/null || true"])
+            .args(["-c", "/usr/bin/pkexec rm -f /var/lib/pacman/db.lck 2>/dev/null || true"])
             .output();
         
         let _ = window.emit("cache-clean-output", "Starting cache clean...");
         
-        let pacman_result = Command::new("/bin/sh")
-            .args(&["-c", "printf 'y\\ny\\n' | /usr/bin/pkexec /usr/bin/pacman -Scc 2>&1"])
-            .output()
-            .expect("Failed to start cache clean");
+        let pacman_result = match Command::new("/bin/sh")
+            .args(["-c", "printf 'y\\ny\\n' | /usr/bin/pkexec /usr/bin/pacman -Scc 2>&1"])
+            .output() {
+            Ok(result) => result,
+            Err(e) => {
+                let _ = window.emit("cache-clean-complete", serde_json::json!({
+                    "success": false,
+                    "message": format!("Failed to start cache clean: {}", e)
+                }));
+                return;
+            }
+        };
 
         let stdout_str = String::from_utf8_lossy(&pacman_result.stdout);
         for line in stdout_str.lines() {
@@ -194,7 +237,7 @@ pub async fn clean_cache_async(window: Window, aur_helper: Option<String>) -> Re
         let _ = window.emit("cache-clean-output", format!("\nCleaning {} cache...", helper_cmd));
         
         let aur_result = Command::new("/bin/sh")
-            .args(&["-c", &format!("timeout 10 /bin/sh -c 'printf \"y\\ny\\n\" | /usr/bin/pkexec {} -Scc' 2>&1 || echo 'Cache clean completed or timed out'", helper_cmd)])
+            .args(["-c", &format!("timeout 10 /bin/sh -c 'printf \"y\\ny\\n\" | /usr/bin/pkexec {} -Scc' 2>&1 || echo 'Cache clean completed or timed out'", helper_cmd)])
             .output();
         
         let mut aur_success = false;

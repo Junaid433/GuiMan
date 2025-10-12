@@ -18,8 +18,8 @@ pub fn get_aur_package_info(package: &str, helper: &str) -> Result<String, Strin
         return Err(format!("{} is not installed", helper_cmd));
     }
 
-    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
-        .args(&["-Si", package])
+    let output = Command::new(format!("/usr/bin/{}", helper_cmd))
+        .args(["-Si", package])
         .output()
         .map_err(|e| format!("Failed to get AUR package info: {}", e))?;
 
@@ -42,8 +42,8 @@ pub fn list_aur_packages(helper: &str) -> Result<Vec<PackageInfo>, String> {
         return Err(format!("{} is not installed. Please install it first.", helper_cmd));
     }
 
-    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
-        .args(&["-Sl", "aur"])
+    let output = Command::new(format!("/usr/bin/{}", helper_cmd))
+        .args(["-Sl", "aur"])
         .output()
         .map_err(|e| format!("Failed to list AUR packages: {}", e))?;
 
@@ -83,8 +83,8 @@ pub fn vote_aur_package(package: &str, helper: &str) -> Result<String, String> {
     }
 
     // Check if package exists in AUR first
-    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
-        .args(&["-Si", package])
+    let output = Command::new(format!("/usr/bin/{}", helper_cmd))
+        .args(["-Si", package])
         .output()
         .map_err(|e| format!("Failed to check package: {}", e))?;
 
@@ -110,8 +110,8 @@ pub fn flag_aur_package(package: &str, helper: &str, comment: Option<String>) ->
     }
 
     // Check if package exists in AUR first
-    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
-        .args(&["-Si", package])
+    let output = Command::new(format!("/usr/bin/{}", helper_cmd))
+        .args(["-Si", package])
         .output()
         .map_err(|e| format!("Failed to check package: {}", e))?;
 
@@ -143,8 +143,8 @@ pub fn adopt_aur_package(package: &str, helper: &str) -> Result<String, String> 
     }
 
     // Check if package exists in AUR first
-    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
-        .args(&["-Si", package])
+    let output = Command::new(format!("/usr/bin/{}", helper_cmd))
+        .args(["-Si", package])
         .output()
         .map_err(|e| format!("Failed to check package: {}", e))?;
 
@@ -178,8 +178,8 @@ pub fn get_aur_build_info(package: &str, helper: &str) -> Result<String, String>
     }
 
     // Get detailed package information including build dependencies
-    let output = Command::new(&format!("/usr/bin/{}", helper_cmd))
-        .args(&["-Si", package])
+    let output = Command::new(format!("/usr/bin/{}", helper_cmd))
+        .args(["-Si", package])
         .output()
         .map_err(|e| format!("Failed to get build info: {}", e))?;
 
@@ -208,7 +208,7 @@ pub fn install_aur_with_options(package: &str, helper: &str, options: Vec<String
     }
 
     let output = Command::new("/usr/bin/pkexec")
-        .arg(&format!("/usr/bin/{}", helper_cmd))
+        .arg(format!("/usr/bin/{}", helper_cmd))
         .args(&args)
         .output()
         .map_err(|e| format!("Failed to install with options: {}", e))?;
@@ -253,7 +253,7 @@ pub async fn install_aur_package_async(window: Window, package: String) -> Resul
         }
 
         let child = Command::new("/usr/bin/pkexec")
-            .args(&[format!("/usr/bin/{}", helper_cmd), "-S".to_string(), "--needed".to_string(), "--noconfirm".to_string(), pkg_clone.clone()])
+            .args([format!("/usr/bin/{}", helper_cmd), "-S".to_string(), "--needed".to_string(), "--noconfirm".to_string(), pkg_clone.clone()])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn();
@@ -263,24 +263,29 @@ pub async fn install_aur_package_async(window: Window, package: String) -> Resul
                 // Handle stdout
                 if let Some(stdout) = child_process.stdout.take() {
                     let reader = BufReader::new(stdout);
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            let _ = window.emit("install-output", line);
-                        }
+                    for line in reader.lines().map_while(Result::ok) {
+                        let _ = window.emit("install-output", line);
                     }
                 }
 
                 // Handle stderr
                 if let Some(stderr) = child_process.stderr.take() {
                     let reader = BufReader::new(stderr);
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            let _ = window.emit("install-output", format!("ERROR: {}", line));
-                        }
+                    for line in reader.lines().map_while(Result::ok) {
+                        let _ = window.emit("install-output", format!("ERROR: {}", line));
                     }
                 }
 
-                let result = child_process.wait().expect("Failed to wait for AUR install");
+                let result = match child_process.wait() {
+                    Ok(result) => result,
+                    Err(e) => {
+                        let _ = window.emit("install-complete", serde_json::json!({
+                            "success": false,
+                            "message": format!("Failed to wait for AUR install process: {}", e)
+                        }));
+                        return;
+                    }
+                };
 
                 let success = result.success();
                 let message = if success {

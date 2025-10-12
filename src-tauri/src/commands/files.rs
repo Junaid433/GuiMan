@@ -11,7 +11,7 @@ pub struct FileInfo {
 #[tauri::command]
 pub async fn list_package_files(package: String) -> Result<Vec<FileInfo>, String> {
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Ql", &package])
+        .args(["-Ql", &package])
         .output()
         .map_err(|e| format!("Failed to list package files: {}", e))?;
 
@@ -45,7 +45,7 @@ pub async fn list_package_files(package: String) -> Result<Vec<FileInfo>, String
 #[tauri::command]
 pub async fn find_file_owner(file_path: String) -> Result<String, String> {
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Qo", &file_path])
+        .args(["-Qo", &file_path])
         .output()
         .map_err(|e| format!("Failed to find file owner: {}", e))?;
 
@@ -68,7 +68,7 @@ pub async fn find_file_owner(file_path: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn search_files(pattern: String) -> Result<Vec<FileInfo>, String> {
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Fl"])
+        .args(["-Fl"])
         .output()
         .map_err(|e| format!("Failed to search files: {}", e))?;
 
@@ -104,7 +104,7 @@ pub async fn search_files(pattern: String) -> Result<Vec<FileInfo>, String> {
 #[tauri::command]
 pub async fn list_package_backups(package: String) -> Result<Vec<String>, String> {
     let output = Command::new("/usr/bin/pacman")
-        .args(&["-Qii", &package])
+        .args(["-Qii", &package])
         .output()
         .map_err(|e| format!("Failed to get package backups: {}", e))?;
 
