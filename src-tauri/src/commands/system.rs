@@ -23,12 +23,37 @@ pub async fn export_package_list() -> Result<Vec<String>, String> {
 pub async fn get_cache_size() -> Result<serde_json::Value, String> {
     let pacman_size = pacman::get_cache_size()?;
     
-    // Check for yay cache
-    let yay_cache_path = std::path::Path::new(&std::env::var("HOME").unwrap_or_default())
-        .join(".cache/yay");
+    let home = std::env::var("HOME").unwrap_or_default();
     
+    // Check for yay cache
+    let yay_cache_path = Path::new(&home).join(".cache/yay");
     let yay_size = if yay_cache_path.exists() {
         let output = if let Some(path_str) = yay_cache_path.to_str() {
+            Command::new("/usr/bin/du")
+                .args(["-sh", path_str])
+                .output()
+                .ok()
+        } else {
+            None
+        };
+        
+        if let Some(out) = output {
+            String::from_utf8_lossy(&out.stdout)
+                .split_whitespace()
+                .next()
+                .unwrap_or("0")
+                .to_string()
+        } else {
+            "0".to_string()
+        }
+    } else {
+        "0".to_string()
+    };
+    
+    // Check for paru cache
+    let paru_cache_path = Path::new(&home).join(".cache/paru/clone");
+    let paru_size = if paru_cache_path.exists() {
+        let output = if let Some(path_str) = paru_cache_path.to_str() {
             Command::new("/usr/bin/du")
                 .args(["-sh", path_str])
                 .output()
@@ -53,7 +78,9 @@ pub async fn get_cache_size() -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({
         "pacman": pacman_size,
         "yay": yay_size,
-        "yay_path": yay_cache_path.to_str().unwrap_or("~/.cache/yay")
+        "yay_path": yay_cache_path.to_str().unwrap_or("~/.cache/yay"),
+        "paru": paru_size,
+        "paru_path": paru_cache_path.to_str().unwrap_or("~/.cache/paru/clone")
     }))
 }
 

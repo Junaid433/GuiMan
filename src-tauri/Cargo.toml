@@ -1,6 +1,6 @@
 [package]
 name = "guiman"
-version = "0.1.4"
+version = "1.5.0"
 edition = "2021"
 authors = ["Junaid Rahman <junaid.cloud2@gmail.com>"]
 description = "The Ultimate Arch Linux Package Manager - GUI with 100% pacman & AUR feature parity"

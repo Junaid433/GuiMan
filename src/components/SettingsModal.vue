@@ -173,11 +173,11 @@
                 </div>
                 <div v-if="localConfig.aurSupport" class="flex items-center justify-between">
                   <div>
-                    <div class="text-sm font-medium text-gray-900 dark:text-white">{{ (localConfig.aurHelper || 'aur').charAt(0).toUpperCase() + (localConfig.aurHelper || 'aur').slice(1) }} Cache</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ cacheSizes.yay_path }}</div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">{{ getAurHelperDisplayName() }} Cache</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ getAurHelperCachePath() }}</div>
                   </div>
                   <div class="text-2xl font-bold text-pink-600 dark:text-pink-400">
-                    {{ cacheSizes.yay }}
+                    {{ getAurHelperCacheSize() }}
                   </div>
                 </div>
               </div>
@@ -195,8 +195,12 @@
             </div>
 
             <div class="space-y-2">
-              <button @click="refreshCacheSizes" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
-                Refresh Cache Sizes
+              <button @click="refreshCacheSizes" :disabled="refreshingCache" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                <svg v-if="refreshingCache" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {{ refreshingCache ? 'Refreshing...' : 'Refresh Cache Sizes' }}
               </button>
               <button @click="$emit('clean-cache')" class="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors">
                 Clean Package Cache
@@ -392,7 +396,7 @@
               <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">GuiMan</h3>
               <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">Arch Linux Package Manager</p>
               <div class="inline-block px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm font-mono text-gray-900 dark:text-white">
-                v0.1.4
+                v1.5.0
               </div>
               <p class="text-gray-500 dark:text-gray-400 text-xs mt-2">
                 <a href="https://github.com/Junaid433" target="_blank" class="text-blue-600 hover:text-blue-700">By Junaid Rahman</a>
@@ -521,10 +525,13 @@ export default {
       updateInfo: null,
       updateProgress: null,
       autoUpdateEnabled: true,
+      refreshingCache: false,
       cacheSizes: {
         pacman: 'Calculating...',
         yay: '0',
-        yay_path: '~/.cache/yay'
+        yay_path: '~/.cache/yay',
+        paru: '0',
+        paru_path: '~/.cache/paru/clone'
       }
     }
   },
@@ -625,12 +632,15 @@ export default {
     },
     
     async refreshCacheSizes() {
+      this.refreshingCache = true
       try {
         const sizes = await invoke('get_cache_size')
         this.cacheSizes = sizes
       } catch (error) {
         console.error('Failed to get cache size:', error)
         this.cacheSizes.pacman = 'Unknown'
+      } finally {
+        this.refreshingCache = false
       }
     },
     async installPolkit() {
@@ -726,6 +736,21 @@ export default {
       } catch (error) {
         console.error('Failed to get auto-update setting:', error)
       }
+    },
+
+    getAurHelperDisplayName() {
+      const helper = this.localConfig.aurHelper || 'yay'
+      return helper.charAt(0).toUpperCase() + helper.slice(1)
+    },
+
+    getAurHelperCacheSize() {
+      const helper = this.localConfig.aurHelper || 'yay'
+      return this.cacheSizes[helper] || '0'
+    },
+
+    getAurHelperCachePath() {
+      const helper = this.localConfig.aurHelper || 'yay'
+      return this.cacheSizes[`${helper}_path`] || `~/.cache/${helper}`
     }
   }
 }
