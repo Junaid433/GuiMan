@@ -19,34 +19,39 @@ pub async fn list_groups() -> Result<Vec<PackageGroup>, String> {
         .map_err(|e| format!("Failed to execute pacman -Sg: {}", e))?;
 
     if !output.status.success() {
-        return Err(format!("pacman -Sg failed: {}", String::from_utf8_lossy(&output.stderr)));
+        return Err(format!(
+            "pacman -Sg failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
-    // Extract unique group names (pacman -Sg without args returns only group names)
+
+    // Extract unique group names. pacman -Sg returns "group package" per line,
+    // so only take the first token as the group identifier.
     let mut group_names: Vec<String> = stdout
         .lines()
-        .map(|line| line.trim().to_string())
-        .filter(|line| !line.is_empty())
+        .filter_map(|line| line.split_whitespace().next().map(|name| name.to_string()))
+        .filter(|name| !name.is_empty())
         .collect();
-    
+
     group_names.sort();
     group_names.dedup();
-    
+
     if group_names.is_empty() {
         return Err("No package groups found on your system".to_string());
     }
-    
+
     // For each group, get its packages (this is slower but correct)
-    let mut groups_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
-    
+    let mut groups_map: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+
     for group_name in &group_names {
         let group_output = Command::new("/usr/bin/pacman")
             .args(["-Sg", group_name])
             .output()
             .map_err(|e| format!("Failed to get packages for group {}: {}", group_name, e))?;
-        
+
         let group_stdout = String::from_utf8_lossy(&group_output.stdout);
         let packages: Vec<String> = group_stdout
             .lines()
@@ -59,7 +64,7 @@ pub async fn list_groups() -> Result<Vec<PackageGroup>, String> {
                 }
             })
             .collect();
-        
+
         if !packages.is_empty() {
             groups_map.insert(group_name.clone(), packages);
         }
@@ -147,6 +152,9 @@ pub async fn get_group_packages(group: String) -> Result<Vec<PackageInfo>, Strin
 
 /// Install a package group
 #[tauri::command]
-pub async fn install_group(window: tauri::Window, group: String) -> Result<crate::models::CommandResult, String> {
+pub async fn install_group(
+    window: tauri::Window,
+    group: String,
+) -> Result<crate::models::CommandResult, String> {
     crate::pacman::operations::install_package_async(window, group).await
 }
