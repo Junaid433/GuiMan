@@ -1,6 +1,6 @@
 use crate::models::PackageInfo;
-use std::process::Command;
 use std::collections::HashMap;
+use std::process::Command;
 
 /// List all installed packages
 pub fn list_installed_packages() -> Result<Vec<PackageInfo>, String> {
@@ -11,16 +11,19 @@ pub fn list_installed_packages() -> Result<Vec<PackageInfo>, String> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut packages = Vec::new();
-    
+
     // Build repository map
     let repo_map = build_repository_map()?;
-    
+
     for line in stdout.lines() {
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() >= 2 {
             let pkg_name = parts[0].to_string();
-            let repo = repo_map.get(&pkg_name).cloned().unwrap_or_else(|| "local".to_string());
-            
+            let repo = repo_map
+                .get(&pkg_name)
+                .cloned()
+                .unwrap_or_else(|| "local".to_string());
+
             packages.push(PackageInfo {
                 name: pkg_name,
                 version: parts[1].to_string(),
@@ -30,19 +33,16 @@ pub fn list_installed_packages() -> Result<Vec<PackageInfo>, String> {
             });
         }
     }
-    
+
     Ok(packages)
 }
 
 /// Build a map of package names to their repositories
 fn build_repository_map() -> Result<HashMap<String, String>, String> {
     let mut repo_map = HashMap::new();
-    
-    let sync_output = Command::new("/usr/bin/pacman")
-        .args(["-Sl"])
-        .output()
-        .ok();
-    
+
+    let sync_output = Command::new("/usr/bin/pacman").args(["-Sl"]).output().ok();
+
     if let Some(sync) = sync_output {
         let sync_str = String::from_utf8_lossy(&sync.stdout);
         for sync_line in sync_str.lines() {
@@ -52,7 +52,7 @@ fn build_repository_map() -> Result<HashMap<String, String>, String> {
             }
         }
     }
-    
+
     Ok(repo_map)
 }
 
@@ -76,9 +76,9 @@ pub fn check_for_updates() -> Result<Vec<PackageInfo>, String> {
             let pkg_name = parts[0].to_string();
             let current_version = parts[1].to_string();
             let new_version = parts[3].to_string();
-            
+
             let repo = get_package_repository(&pkg_name).unwrap_or_else(|| "unknown".to_string());
-            
+
             packages.push(PackageInfo {
                 name: pkg_name,
                 version: new_version.clone(),
@@ -98,16 +98,11 @@ fn get_package_repository(package: &str) -> Option<String> {
         .args(["-Si", package])
         .output()
         .ok()?;
-    
+
     let info_str = String::from_utf8_lossy(&output.stdout);
     for line in info_str.lines() {
         if line.starts_with("Repository") {
-            return Some(
-                line.split(':')
-                    .nth(1)?
-                    .trim()
-                    .to_string()
-            );
+            return Some(line.split(':').nth(1)?.trim().to_string());
         }
     }
     None
@@ -143,7 +138,9 @@ pub fn get_package_history() -> Result<Vec<PackageInfo>, String> {
     let mut history = Vec::new();
 
     for line in stdout.lines() {
-        if line.contains("[ALPM]") && (line.contains("installed") || line.contains("removed") || line.contains("upgraded")) {
+        if line.contains("[ALPM]")
+            && (line.contains("installed") || line.contains("removed") || line.contains("upgraded"))
+        {
             if let Some(parsed) = parse_log_entry(line) {
                 history.push(parsed);
             }
@@ -173,7 +170,7 @@ fn parse_log_entry(line: &str) -> Option<PackageInfo> {
             let name = rest[..open_paren].to_string();
             let version_part = &rest[open_paren + 2..];
             let version = version_part.trim_end_matches(')').to_string();
-            
+
             return Some(PackageInfo {
                 name,
                 version,
@@ -189,7 +186,7 @@ fn parse_log_entry(line: &str) -> Option<PackageInfo> {
             let name = rest[..open_paren].to_string();
             let version_part = &rest[open_paren + 2..];
             let version = version_part.trim_end_matches(')').to_string();
-            
+
             return Some(PackageInfo {
                 name,
                 version,
@@ -205,14 +202,14 @@ fn parse_log_entry(line: &str) -> Option<PackageInfo> {
             let name = rest[..open_paren].to_string();
             let version_part = &rest[open_paren + 2..];
             let version_info = version_part.trim_end_matches(')');
-            
+
             // Extract new version (after ->)
             let version = if let Some(arrow_pos) = version_info.find(" -> ") {
                 version_info[arrow_pos + 4..].to_string()
             } else {
                 version_info.to_string()
             };
-            
+
             return Some(PackageInfo {
                 name,
                 version,
@@ -238,15 +235,28 @@ pub fn get_package_info(package: &str, repo: &str, is_installed: bool) -> Result
         Command::new("/usr/bin/pacman")
             .args(["-Qi", package])
             .output()
-            .map_err(|e| format!("Failed to get installed package info for '{}': {}", package, e))?
+            .map_err(|e| {
+                format!(
+                    "Failed to get installed package info for '{}': {}",
+                    package, e
+                )
+            })?
     } else if repo == "aur" {
         // This will be handled by AUR module
-        return Err(format!("Cannot get repository info for AUR package '{}': use AUR module instead", package));
+        return Err(format!(
+            "Cannot get repository info for AUR package '{}': use AUR module instead",
+            package
+        ));
     } else {
         Command::new("/usr/bin/pacman")
             .args(["-Si", package])
             .output()
-            .map_err(|e| format!("Failed to get repository package info for '{}': {}", package, e))?
+            .map_err(|e| {
+                format!(
+                    "Failed to get repository package info for '{}': {}",
+                    package, e
+                )
+            })?
     };
 
     if !output.status.success() || output.stdout.is_empty() {
@@ -281,4 +291,3 @@ pub fn get_cache_size() -> Result<String, String> {
         .unwrap_or("Unknown")
         .to_string())
 }
-

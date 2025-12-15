@@ -1,5 +1,5 @@
-use std::process::Command;
 use std::fs;
+use std::process::Command;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Repository {
@@ -19,7 +19,8 @@ pub async fn list_repositories() -> Result<Vec<Repository>, String> {
         .map_err(|e| format!("Failed to list repositories: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut repo_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut repo_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
 
     for line in stdout.lines() {
         if let Some(repo_name) = line.split_whitespace().next() {
@@ -28,8 +29,7 @@ pub async fn list_repositories() -> Result<Vec<Repository>, String> {
     }
 
     // Read pacman.conf to get enabled repos and servers
-    let conf_content = fs::read_to_string("/etc/pacman.conf")
-        .unwrap_or_else(|_| String::new());
+    let conf_content = fs::read_to_string("/etc/pacman.conf").unwrap_or_else(|_| String::new());
 
     let mut repositories = Vec::new();
     let mut current_repo: Option<String> = None;
@@ -37,7 +37,7 @@ pub async fn list_repositories() -> Result<Vec<Repository>, String> {
 
     for line in conf_content.lines() {
         let trimmed = line.trim();
-        
+
         // Check for repo section [reponame]
         if trimmed.starts_with('[') && trimmed.ends_with(']') && trimmed != "[options]" {
             // Save previous repo
@@ -51,9 +51,9 @@ pub async fn list_repositories() -> Result<Vec<Repository>, String> {
                 });
                 servers.clear();
             }
-            
+
             // Start new repo
-            let repo_name = trimmed[1..trimmed.len()-1].to_string();
+            let repo_name = trimmed[1..trimmed.len() - 1].to_string();
             current_repo = Some(repo_name);
         } else if trimmed.starts_with("Server") && current_repo.is_some() {
             if let Some(server) = trimmed.split('=').nth(1) {
@@ -89,7 +89,7 @@ pub async fn get_repo_packages(repo: String) -> Result<Vec<crate::models::Packag
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
+
     // Get installed packages
     let installed_output = Command::new("/usr/bin/pacman")
         .args(["-Q"])
@@ -111,7 +111,7 @@ pub async fn get_repo_packages(repo: String) -> Result<Vec<crate::models::Packag
                 let package_name = parts[1];
                 let version = parts[2];
                 let is_installed = installed.contains(package_name);
-                
+
                 Some(crate::models::PackageInfo {
                     name: package_name.to_string(),
                     version: version.to_string(),
@@ -161,14 +161,11 @@ pub async fn get_mirrorlist_info() -> Result<Vec<MirrorInfo>, String> {
 
     for line in content.lines() {
         let trimmed = line.trim();
-        
+
         // Check for country comment
         if trimmed.starts_with("##") {
             // Extract country name
-            current_country = trimmed
-                .trim_start_matches('#')
-                .trim()
-                .to_string();
+            current_country = trimmed.trim_start_matches('#').trim().to_string();
         } else if trimmed.starts_with("Server") || trimmed.starts_with("#Server") {
             let enabled = !trimmed.starts_with('#');
             let url = if enabled {
@@ -182,7 +179,7 @@ pub async fn get_mirrorlist_info() -> Result<Vec<MirrorInfo>, String> {
                     .trim()
                     .to_string()
             };
-            
+
             if !url.is_empty() {
                 mirrors.push(MirrorInfo {
                     url,
@@ -245,7 +242,9 @@ pub async fn rank_mirrors(country: Option<String>, count: Option<usize>) -> Resu
         .map_err(|e| format!("Failed to check for reflector: {}", e))?;
 
     if !check.status.success() {
-        return Err("Reflector is not installed. Install it with: sudo pacman -S reflector".to_string());
+        return Err(
+            "Reflector is not installed. Install it with: sudo pacman -S reflector".to_string(),
+        );
     }
 
     let mut args = vec![
@@ -283,5 +282,3 @@ pub async fn rank_mirrors(country: Option<String>, count: Option<usize>) -> Resu
         Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
 }
-
-

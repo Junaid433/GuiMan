@@ -191,10 +191,10 @@
 
 <script>
 import { ref, onMounted, computed, onUnmounted, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { appWindow } from '@tauri-apps/api/window'
-import { sendNotification, isPermissionGranted, requestPermission } from '@tauri-apps/api/notification'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { sendNotification, isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification'
 import Sidebar from './components/Sidebar.vue'
 import SearchBar from './components/SearchBar.vue'
 import PackageTable from './components/PackageTable.vue'
@@ -209,6 +209,7 @@ import Dashboard from './components/Dashboard.vue'
 import PackageGrid from './components/PackageGrid.vue'
 import NotificationSystem from './components/NotificationSystem.vue'
 import configManager from './utils/config.js'
+const appWindow = getCurrentWebviewWindow()
 
 export default {
   name: 'App',

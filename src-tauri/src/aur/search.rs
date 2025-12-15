@@ -1,7 +1,7 @@
 use crate::models::PackageInfo;
-use crate::utils::{strip_ansi_codes, is_command_available};
+use crate::utils::{is_command_available, strip_ansi_codes};
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::process::Command;
-use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 
 /// Search AUR packages using the specified helper
 pub fn search_aur(
@@ -22,7 +22,12 @@ pub fn search_aur(
     let output = Command::new(format!("/usr/bin/{}", helper_cmd))
         .args(["-Ss", query])
         .output()
-        .map_err(|e| format!("Failed to search AUR for '{}' using {}: {}", query, helper_cmd, e))?;
+        .map_err(|e| {
+            format!(
+                "Failed to search AUR for '{}' using {}: {}",
+                query, helper_cmd, e
+            )
+        })?;
 
     if !output.status.success() {
         return Ok(Vec::new());
@@ -50,7 +55,8 @@ pub fn search_aur(
                     } else {
                         "unknown".to_string()
                     };
-                    let installed = line.to_lowercase().contains("[installed]") || line.contains("(Installed)");
+                    let installed =
+                        line.to_lowercase().contains("[installed]") || line.contains("(Installed)");
 
                     if let Some(score) = matcher.fuzzy_match(name, query) {
                         let description = if i + 1 < lines.len() {
@@ -85,4 +91,3 @@ pub fn search_aur(
 
     Ok(scored_packages)
 }
-

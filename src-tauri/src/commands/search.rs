@@ -1,7 +1,7 @@
-use crate::models::PackageInfo;
 use crate::aur;
+use crate::models::PackageInfo;
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::process::Command;
-use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 
 #[tauri::command]
 pub async fn search_package(
@@ -58,10 +58,7 @@ pub async fn search_package(
     scored_packages.sort_by(|a, b| b.0.cmp(&a.0));
     scored_packages.truncate(50);
 
-    let mut packages: Vec<PackageInfo> = scored_packages
-        .into_iter()
-        .map(|(_, pkg)| pkg)
-        .collect();
+    let mut packages: Vec<PackageInfo> = scored_packages.into_iter().map(|(_, pkg)| pkg).collect();
 
     // Get descriptions for official packages only
     enrich_package_descriptions(&mut packages)?;
@@ -102,20 +99,10 @@ fn enrich_package_descriptions(packages: &mut [PackageInfo]) -> Result<(), Strin
                         pkg.description = current_desc.clone();
                     }
                 }
-                current_name = line
-                    .split(':')
-                    .nth(1)
-                    .unwrap_or("")
-                    .trim()
-                    .to_string();
+                current_name = line.split(':').nth(1).unwrap_or("").trim().to_string();
                 current_desc = String::new();
             } else if line.starts_with("Description") {
-                current_desc = line
-                    .split(':')
-                    .nth(1)
-                    .unwrap_or("")
-                    .trim()
-                    .to_string();
+                current_desc = line.split(':').nth(1).unwrap_or("").trim().to_string();
             }
         }
 
@@ -131,4 +118,3 @@ fn enrich_package_descriptions(packages: &mut [PackageInfo]) -> Result<(), Strin
 
     Ok(())
 }
-

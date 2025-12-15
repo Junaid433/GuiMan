@@ -2,53 +2,32 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:5173",
-    "distDir": "../dist",
-    "withGlobalTauri": false
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173"
   },
-  "package": {
-    "productName": "guiman",
-    "version": "1.5.0"
+  "bundle": {
+    "active": true,
+    "targets": "deb"
   },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "notification": {
-        "all": true
-      },
-      "shell": {
-        "all": false,
-        "open": true
-      },
-      "window": {
-        "all": false,
-        "close": true,
-        "hide": true,
-        "show": true,
-        "maximize": true,
-        "minimize": true,
-        "unmaximize": true,
-        "unminimize": true,
-        "startDragging": true
-      }
-    },
-    "bundle": {
-      "active": true,
-      "targets": "deb",
-      "identifier": "com.guiman.app"
-    },
-    "security": {
-      "csp": null
-    },
+  "productName": "guiman",
+  "mainBinaryName": "guiman",
+  "version": "1.5.0",
+  "identifier": "com.guiman.app",
+  "plugins": {},
+  "app": {
+    "withGlobalTauri": false,
     "windows": [
       {
         "fullscreen": false,
         "resizable": true,
         "title": "GuiMan - Arch Package Manager",
         "width": 1200,
-        "height": 800
+        "height": 800,
+        "useHttpsScheme": true
       }
-    ]
+    ],
+    "security": {
+      "csp": null
+    }
   }
 }
-
