@@ -124,13 +124,8 @@
 </template>
 
 <script>
-import PieChart from './PieChart.vue'
-
 export default {
   name: 'DataVisualization',
-  components: {
-    PieChart
-  },
   props: {
     systemStats: {
       type: Object,
@@ -157,31 +152,6 @@ export default {
     }
   },
   computed: {
-    repoData() {
-      const repoCounts = {}
-      this.packages.forEach(pkg => {
-        const repo = pkg.repo || 'unknown'
-        repoCounts[repo] = (repoCounts[repo] || 0) + 1
-      })
-
-      const colors = {
-        'core': '#8B5CF6',
-        'extra': '#3B82F6',
-        'community': '#10B981',
-        'multilib': '#F59E0B',
-        'aur': '#EC4899',
-        'orphan': '#EF4444',
-        'unknown': '#6B7280'
-      }
-
-      return Object.entries(repoCounts)
-        .map(([name, value]) => ({
-          name,
-          value,
-          color: colors[name] || colors.unknown
-        }))
-        .sort((a, b) => b.value - a.value)
-    },
     healthScore() {
       const total = this.systemStats.totalPackages
       if (total === 0) return 0

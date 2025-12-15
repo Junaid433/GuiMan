@@ -143,11 +143,11 @@
       </div>
 
       <!-- Recent Updates -->
-      <div v-if="recentUpdates.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div v-if="displayedUpdates.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Recent Updates</h2>
         <div class="space-y-3">
           <div
-            v-for="update in recentUpdates.slice(0, 5)"
+            v-for="update in displayedUpdates"
             :key="update.name"
             class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
           >
@@ -175,11 +175,11 @@
       />
 
       <!-- Popular Packages -->
-      <div v-if="popularPackages.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div v-if="displayedPopular.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Popular Packages</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div
-            v-for="pkg in popularPackages.slice(0, 6)"
+            v-for="pkg in displayedPopular"
             :key="pkg.name"
             class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer"
             @click="$emit('show-details', pkg)"
@@ -199,8 +199,23 @@
 </template>
 
 <script>
-import DataVisualization from './DataVisualization.vue'
+import { defineAsyncComponent, computed } from 'vue'
 import SkeletonLoader from './SkeletonLoader.vue'
+
+// Lazy load heavy visualization component
+const DataVisualization = defineAsyncComponent(() => 
+  import('./DataVisualization.vue')
+)
+
+// Memoize date formatting
+const dateCache = new Map()
+const formatDateCached = (dateString) => {
+  if (!dateString) return ''
+  if (dateCache.has(dateString)) return dateCache.get(dateString)
+  const formatted = new Date(dateString).toLocaleDateString()
+  dateCache.set(dateString, formatted)
+  return formatted
+}
 
 export default {
   name: 'Dashboard',
@@ -236,10 +251,15 @@ export default {
     }
   },
   emits: ['update-system', 'change-view', 'show-details'],
-  methods: {
-    formatDate(dateString) {
-      const date = new Date(dateString)
-      return date.toLocaleDateString()
+  setup(props) {
+    // Pre-slice arrays to avoid re-computing in template
+    const displayedUpdates = computed(() => props.recentUpdates.slice(0, 5))
+    const displayedPopular = computed(() => props.popularPackages.slice(0, 6))
+    
+    return {
+      displayedUpdates,
+      displayedPopular,
+      formatDate: formatDateCached
     }
   }
 }

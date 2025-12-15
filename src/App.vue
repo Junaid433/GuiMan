@@ -190,7 +190,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, onMounted, computed, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
@@ -231,7 +231,7 @@ export default {
   setup() {
     const activeView = ref('dashboard')
     const searchQuery = ref('')
-    const packages = ref([])
+    const packages = shallowRef([])  // Use shallowRef for large arrays
     const loading = ref(false)
     const selectedPackages = ref([])
     const showLogModal = ref(false)
@@ -449,21 +449,36 @@ export default {
       try {
         switch (view) {
           case 'dashboard':
-            // Load dashboard data without loading all installed packages
+            // Load dashboard data efficiently - avoid loading full package list
             try {
-              const [orphans, updates, popular, history, installed] = await Promise.all([
+              // Load stats and lightweight data in parallel
+              const [orphans, updates, popular, history] = await Promise.all([
                 invoke('list_orphans'),
                 invoke('check_updates'),
                 invoke('get_popular_packages'),
-                invoke('get_package_history'),
-                invoke('list_installed')
+                invoke('get_package_history')
               ])
 
+              // Get package counts without loading full package data
+              let totalCount = 0
+              let aurCount = 0
+              try {
+                const countResult = await invoke('get_package_counts')
+                totalCount = countResult.total || 0
+                aurCount = countResult.aur || 0
+              } catch {
+                // Fallback: load installed packages only if counts endpoint fails
+                const installed = await invoke('list_installed')
+                totalCount = installed.length
+                aurCount = installed.filter(p => p.repo === 'aur').length
+                packages.value = installed
+              }
+
               systemStats.value = {
-                totalPackages: installed.length,
+                totalPackages: totalCount,
                 updatesAvailable: updates.length,
                 orphans: orphans.length,
-                aurPackages: installed.filter(p => p.repo === 'aur').length
+                aurPackages: aurCount
               }
 
               popularPackages.value = popular.slice(0, 6)
@@ -473,9 +488,6 @@ export default {
                 newVersion: h.new_version || h.version,
                 date: h.date || new Date().toISOString()
               }))
-
-              // Store packages for analytics but don't display them
-              packages.value = installed
             } catch (error) {
               console.error('Failed to load dashboard data:', error)
             }

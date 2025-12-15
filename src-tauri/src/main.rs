@@ -23,6 +23,7 @@ fn main() {
             get_popular_packages,
             // Package commands
             list_installed,
+            get_package_counts,
             check_updates,
             list_orphans,
             get_package_history,

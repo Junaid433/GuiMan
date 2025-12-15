@@ -8,9 +8,10 @@
           :fill="slice.color"
           :stroke="strokeColor"
           :stroke-width="strokeWidth"
-          class="transition-all duration-300 hover:opacity-80 cursor-pointer"
-          @mouseover="hoveredSlice = index"
-          @mouseout="hoveredSlice = null"
+          class="transition-opacity duration-150 hover:opacity-80 cursor-pointer"
+          @mouseenter="handleSliceEnter($event, index)"
+          @mousemove="handleMouseMove"
+          @mouseleave="handleSliceLeave"
         />
       </g>
 
@@ -147,17 +148,21 @@ export default {
   },
   methods: {
     handleMouseMove(event) {
-      this.tooltipPosition = {
-        x: event.clientX,
-        y: event.clientY - 10
+      // Only update when hovering a slice (not globally)
+      if (this.hoveredSlice !== null) {
+        this.tooltipPosition = {
+          x: event.clientX,
+          y: event.clientY - 10
+        }
       }
+    },
+    handleSliceEnter(event, index) {
+      this.hoveredSlice = index
+      this.handleMouseMove(event)
+    },
+    handleSliceLeave() {
+      this.hoveredSlice = null
     }
-  },
-  mounted() {
-    document.addEventListener('mousemove', this.handleMouseMove)
-  },
-  beforeUnmount() {
-    document.removeEventListener('mousemove', this.handleMouseMove)
   }
 }
 </script>

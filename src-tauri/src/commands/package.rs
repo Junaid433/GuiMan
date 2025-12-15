@@ -1,8 +1,42 @@
 use crate::models::{CommandResult, PackageInfo};
 use crate::{aur, pacman, utils};
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::process::Command;
 use tauri::Window;
+
+#[derive(Serialize, Deserialize)]
+pub struct PackageCounts {
+    pub total: u32,
+    pub aur: u32,
+}
+
+#[tauri::command]
+pub async fn get_package_counts() -> Result<PackageCounts, String> {
+    // Get total package count efficiently using pacman -Q | wc -l
+    let total_output = Command::new("sh")
+        .args(["-c", "pacman -Qq | wc -l"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let total = String::from_utf8_lossy(&total_output.stdout)
+        .trim()
+        .parse::<u32>()
+        .unwrap_or(0);
+
+    // Get AUR package count (foreign packages not in official repos)
+    let aur_output = Command::new("sh")
+        .args(["-c", "pacman -Qmq | wc -l"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let aur = String::from_utf8_lossy(&aur_output.stdout)
+        .trim()
+        .parse::<u32>()
+        .unwrap_or(0);
+
+    Ok(PackageCounts { total, aur })
+}
 
 #[tauri::command]
 pub async fn list_installed() -> Result<Vec<PackageInfo>, String> {
