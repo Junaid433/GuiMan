@@ -1,10 +1,11 @@
-use crate::models::{PackageInfo, CommandResult};
+use crate::models::{CommandResult, PackageInfo};
 use crate::utils::is_command_available;
-use std::process::{Command, Stdio};
-use std::io::{BufRead, BufReader};
-use tauri::Window;
-use tokio;
 use serde_json;
+use std::io::{BufRead, BufReader};
+use std::process::{Command, Stdio};
+use tauri::Window;
+use tauri::Emitter;
+use tokio;
 
 /// Get package information from AUR
 pub fn get_aur_package_info(package: &str, helper: &str) -> Result<String, String> {
@@ -39,7 +40,10 @@ pub fn list_aur_packages(helper: &str) -> Result<Vec<PackageInfo>, String> {
     };
 
     if !is_command_available(helper_cmd) {
-        return Err(format!("{} is not installed. Please install it first.", helper_cmd));
+        return Err(format!(
+            "{} is not installed. Please install it first.",
+            helper_cmd
+        ));
     }
 
     let output = Command::new(format!("/usr/bin/{}", helper_cmd))
@@ -55,7 +59,8 @@ pub fn list_aur_packages(helper: &str) -> Result<Vec<PackageInfo>, String> {
         if parts.len() >= 3 {
             let name = parts[1];
             let version = parts[2];
-            let installed = line.to_lowercase().contains("[installed]") || line.contains("(Installed)");
+            let installed =
+                line.to_lowercase().contains("[installed]") || line.contains("(Installed)");
 
             packages.push(PackageInfo {
                 name: name.to_string(),
@@ -98,10 +103,14 @@ pub fn vote_aur_package(package: &str, helper: &str) -> Result<String, String> {
 }
 
 /// Flag AUR package as out-of-date
-pub fn flag_aur_package(package: &str, helper: &str, comment: Option<String>) -> Result<String, String> {
+pub fn flag_aur_package(
+    package: &str,
+    helper: &str,
+    comment: Option<String>,
+) -> Result<String, String> {
     let helper_cmd = match helper {
         "yay" => "yay",
-        "paru" => "paru", 
+        "paru" => "paru",
         _ => return Err("Invalid AUR helper".to_string()),
     };
 
@@ -126,7 +135,7 @@ pub fn flag_aur_package(package: &str, helper: &str, comment: Option<String>) ->
     } else {
         format!("To flag this package as out-of-date:\n1. Visit: {}\n2. Log in with your AUR account\n3. Click 'Flag Package Out-of-Date'\n\nNote: Only flag if the package is actually outdated.", aur_url)
     };
-    
+
     Err(message)
 }
 
@@ -155,9 +164,9 @@ pub fn adopt_aur_package(package: &str, helper: &str) -> Result<String, String> 
     // Check if package is orphaned by looking for "Maintainer: None"
     let stdout = String::from_utf8_lossy(&output.stdout);
     let is_orphaned = stdout.contains("Maintainer") && stdout.contains("None");
-    
+
     let aur_url = format!("https://aur.archlinux.org/packages/{}", package);
-    
+
     if is_orphaned {
         Err(format!("To adopt this orphaned package:\n1. Visit: {}\n2. Log in with your AUR account\n3. Click 'Adopt Package'\n\nNote: You will become the maintainer and be responsible for updates.", aur_url))
     } else {
@@ -191,7 +200,11 @@ pub fn get_aur_build_info(package: &str, helper: &str) -> Result<String, String>
 }
 
 /// Install AUR package with custom build options
-pub fn install_aur_with_options(package: &str, helper: &str, options: Vec<String>) -> Result<String, String> {
+pub fn install_aur_with_options(
+    package: &str,
+    helper: &str,
+    options: Vec<String>,
+) -> Result<String, String> {
     let helper_cmd = match helper {
         "yay" => "yay",
         "paru" => "paru",
@@ -213,14 +226,20 @@ pub fn install_aur_with_options(package: &str, helper: &str, options: Vec<String
         .map_err(|e| format!("Failed to install with options: {}", e))?;
 
     if output.status.success() {
-        Ok(format!("Successfully installed {} with custom options", package))
+        Ok(format!(
+            "Successfully installed {} with custom options",
+            package
+        ))
     } else {
         Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
 }
 
 /// Install an AUR package asynchronously with real-time output
-pub async fn install_aur_package_async(window: Window, package: String) -> Result<CommandResult, String> {
+pub async fn install_aur_package_async(
+    window: Window,
+    package: String,
+) -> Result<CommandResult, String> {
     let pkg_clone = package.clone();
     let helper = "yay".to_string();
 
@@ -234,7 +253,7 @@ pub async fn install_aur_package_async(window: Window, package: String) -> Resul
                     serde_json::json!({
                         "success": false,
                         "message": "✗ Invalid AUR helper specified"
-                    })
+                    }),
                 );
                 return;
             }
@@ -246,7 +265,7 @@ pub async fn install_aur_package_async(window: Window, package: String) -> Resul
                 serde_json::json!({
                     "success": false,
                     "message": format!("✗ {} is not installed", helper_cmd)
-                })
+                }),
             );
             return;
         }
@@ -275,16 +294,17 @@ pub async fn install_aur_package_async(window: Window, package: String) -> Resul
                     }
                 }
 
-                let result = match child_process.wait() {
-                    Ok(result) => result,
-                    Err(e) => {
-                        let _ = window.emit("install-complete", serde_json::json!({
+                let result =
+                    match child_process.wait() {
+                        Ok(result) => result,
+                        Err(e) => {
+                            let _ = window.emit("install-complete", serde_json::json!({
                             "success": false,
                             "message": format!("Failed to wait for AUR install process: {}", e)
                         }));
-                        return;
-                    }
-                };
+                            return;
+                        }
+                    };
 
                 let success = result.success();
                 let message = if success {
@@ -298,7 +318,7 @@ pub async fn install_aur_package_async(window: Window, package: String) -> Resul
                     serde_json::json!({
                         "success": success,
                         "message": message
-                    })
+                    }),
                 );
             }
             Err(_) => {
@@ -307,17 +327,23 @@ pub async fn install_aur_package_async(window: Window, package: String) -> Resul
                     serde_json::json!({
                         "success": false,
                         "message": format!("✗ Failed to start AUR installation for {}", pkg_clone)
-                    })
+                    }),
                 );
             }
         }
     });
 
-    Ok(CommandResult::success(format!("AUR installation of {} started", package)))
+    Ok(CommandResult::success(format!(
+        "AUR installation of {} started",
+        package
+    )))
 }
 
 /// Remove an AUR package asynchronously with real-time output
-pub async fn remove_aur_package_async(window: Window, package: String) -> Result<CommandResult, String> {
+pub async fn remove_aur_package_async(
+    window: Window,
+    package: String,
+) -> Result<CommandResult, String> {
     let pkg_clone = package.clone();
     let helper = "yay".to_string();
 
@@ -331,7 +357,7 @@ pub async fn remove_aur_package_async(window: Window, package: String) -> Result
                     serde_json::json!({
                         "success": false,
                         "message": "✗ Invalid AUR helper specified"
-                    })
+                    }),
                 );
                 return;
             }
@@ -343,7 +369,7 @@ pub async fn remove_aur_package_async(window: Window, package: String) -> Result
                 serde_json::json!({
                     "success": false,
                     "message": format!("✗ {} is not installed", helper_cmd)
-                })
+                }),
             );
             return;
         }
@@ -372,16 +398,17 @@ pub async fn remove_aur_package_async(window: Window, package: String) -> Result
                     }
                 }
 
-                let result = match child_process.wait() {
-                    Ok(result) => result,
-                    Err(e) => {
-                        let _ = window.emit("remove-complete", serde_json::json!({
+                let result =
+                    match child_process.wait() {
+                        Ok(result) => result,
+                        Err(e) => {
+                            let _ = window.emit("remove-complete", serde_json::json!({
                             "success": false,
                             "message": format!("Failed to wait for AUR remove process: {}", e)
                         }));
-                        return;
-                    }
-                };
+                            return;
+                        }
+                    };
 
                 let success = result.success();
                 let message = if success {
@@ -395,7 +422,7 @@ pub async fn remove_aur_package_async(window: Window, package: String) -> Result
                     serde_json::json!({
                         "success": success,
                         "message": message
-                    })
+                    }),
                 );
             }
             Err(_) => {
@@ -404,12 +431,14 @@ pub async fn remove_aur_package_async(window: Window, package: String) -> Result
                     serde_json::json!({
                         "success": false,
                         "message": format!("✗ Failed to start AUR removal for {}", pkg_clone)
-                    })
+                    }),
                 );
             }
         }
     });
 
-    Ok(CommandResult::success(format!("AUR removal of {} started", package)))
+    Ok(CommandResult::success(format!(
+        "AUR removal of {} started",
+        package
+    )))
 }
-

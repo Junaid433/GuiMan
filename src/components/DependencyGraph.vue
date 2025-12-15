@@ -137,7 +137,7 @@
 </template>
 
 <script>
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import DependencyTreeNode from './DependencyTreeNode.vue'
 
 export default {

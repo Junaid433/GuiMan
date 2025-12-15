@@ -1,8 +1,8 @@
-use crate::models::{PackageInfo, CommandResult};
-use crate::{pacman, aur, utils};
-use tauri::Window;
-use std::process::Command;
+use crate::models::{CommandResult, PackageInfo};
+use crate::{aur, pacman, utils};
 use serde_json;
+use std::process::Command;
+use tauri::Window;
 
 #[tauri::command]
 pub async fn list_installed() -> Result<Vec<PackageInfo>, String> {
@@ -92,7 +92,11 @@ pub async fn vote_aur_package(package: String, helper: String) -> Result<String,
 }
 
 #[tauri::command]
-pub async fn flag_aur_package(package: String, helper: String, comment: Option<String>) -> Result<String, String> {
+pub async fn flag_aur_package(
+    package: String,
+    helper: String,
+    comment: Option<String>,
+) -> Result<String, String> {
     aur::flag_aur_package(&package, &helper, comment)
 }
 
@@ -107,7 +111,10 @@ pub async fn get_aur_build_info(package: String, helper: String) -> Result<Strin
 }
 
 #[tauri::command]
-pub async fn install_aur_with_options(package: String, helper: String, options: Vec<String>) -> Result<String, String> {
+pub async fn install_aur_with_options(
+    package: String,
+    helper: String,
+    options: Vec<String>,
+) -> Result<String, String> {
     aur::install_aur_with_options(&package, &helper, options)
 }
-

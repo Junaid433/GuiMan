@@ -1,8 +1,8 @@
 use crate::models::CommandResult;
 use crate::pacman;
-use tauri::Window;
-use std::process::Command;
 use std::path::Path;
+use std::process::Command;
+use tauri::Window;
 
 #[tauri::command]
 pub async fn update_system(window: Window) -> Result<CommandResult, String> {
@@ -10,7 +10,10 @@ pub async fn update_system(window: Window) -> Result<CommandResult, String> {
 }
 
 #[tauri::command]
-pub async fn clean_cache(window: Window, aur_helper: Option<String>) -> Result<CommandResult, String> {
+pub async fn clean_cache(
+    window: Window,
+    aur_helper: Option<String>,
+) -> Result<CommandResult, String> {
     pacman::operations::clean_cache_async(window, aur_helper).await
 }
 
@@ -22,9 +25,9 @@ pub async fn export_package_list() -> Result<Vec<String>, String> {
 #[tauri::command]
 pub async fn get_cache_size() -> Result<serde_json::Value, String> {
     let pacman_size = pacman::get_cache_size()?;
-    
+
     let home = std::env::var("HOME").unwrap_or_default();
-    
+
     // Check for yay cache
     let yay_cache_path = Path::new(&home).join(".cache/yay");
     let yay_size = if yay_cache_path.exists() {
@@ -36,7 +39,7 @@ pub async fn get_cache_size() -> Result<serde_json::Value, String> {
         } else {
             None
         };
-        
+
         if let Some(out) = output {
             String::from_utf8_lossy(&out.stdout)
                 .split_whitespace()
@@ -49,7 +52,7 @@ pub async fn get_cache_size() -> Result<serde_json::Value, String> {
     } else {
         "0".to_string()
     };
-    
+
     // Check for paru cache
     let paru_cache_path = Path::new(&home).join(".cache/paru/clone");
     let paru_size = if paru_cache_path.exists() {
@@ -61,7 +64,7 @@ pub async fn get_cache_size() -> Result<serde_json::Value, String> {
         } else {
             None
         };
-        
+
         if let Some(out) = output {
             String::from_utf8_lossy(&out.stdout)
                 .split_whitespace()
@@ -74,7 +77,7 @@ pub async fn get_cache_size() -> Result<serde_json::Value, String> {
     } else {
         "0".to_string()
     };
-    
+
     Ok(serde_json::json!({
         "pacman": pacman_size,
         "yay": yay_size,
@@ -91,36 +94,197 @@ pub async fn get_popular_packages() -> Result<Vec<crate::models::PackageInfo>, S
     use std::process::Command;
 
     let popular_packages = vec![
-        "firefox", "chromium", "vlc", "gimp", "libreoffice-fresh", "thunderbird",
-        "inkscape", "blender", "audacity", "obs-studio", "kdenlive", "krita",
-        "telegram-desktop", "discord", "spotify-launcher", "steam", "lutris",
-        "wine", "docker", "virtualbox", "qemu", "libvirt", "ansible", "terraform",
-        "kubectl", "helm", "git", "vim", "neovim", "emacs", "vscode", "code",
-        "nodejs", "npm", "python", "python-pip", "rust", "go", "ruby", "php",
-        "mariadb", "postgresql", "redis", "mongodb", "nginx", "apache", "caddy",
-        "htop", "tmux", "zsh", "fish", "starship", "alacritty", "kitty",
-        "bat", "exa", "fd", "ripgrep", "fzf", "jq", "yq", "wget", "curl",
-        "rsync", "rclone", "syncthing", "nextcloud-client", "keepassxc",
-        "pass", "bitwarden", "veracrypt", "gnupg", "openssh", "wireguard-tools",
-        "openvpn", "nmap", "wireshark-qt", "tcpdump", "netcat", "socat",
-        "ffmpeg", "imagemagick", "graphicsmagick", "pandoc", "hugo", "jekyll",
-        "latex", "texlive-core", "texlive-latexextra", "r", "jupyter-notebook",
-        "octave", "scilab", "maxima", "sagemath", "gcc", "clang", "cmake",
-        "make", "autoconf", "automake", "gdb", "valgrind", "strace", "ltrace",
-        "doxygen", "sphinx", "gtk3", "gtk4", "qt5-base", "qt6-base", "sdl2",
-        "vulkan-tools", "mesa", "lib32-mesa", "nvidia", "nvidia-utils",
-        "xorg-server", "wayland", "sway", "i3-wm", "awesome", "bspwm",
-        "plasma-desktop", "gnome", "xfce4", "mate", "cinnamon", "budgie-desktop",
-        "lightdm", "sddm", "gdm", "greetd", "ly", "cups", "bluez", "bluez-utils",
-        "pulseaudio", "pipewire", "pipewire-pulse", "wireplumber", "alsa-utils",
-        "pavucontrol", "helvum", "gparted", "gnome-disk-utility", "timeshift",
-        "borgbackup", "restic", "duplicati", "baobab", "ncdu", "dust",
-        "neofetch", "screenfetch", "fastfetch", "btop", "bottom", "glances",
-        "nmon", "iotop", "nethogs", "iftop", "bmon", "vnstat", "speedtest-cli",
-        "yt-dlp", "youtube-dl", "mpv", "mplayer", "smplayer", "celluloid",
-        "handbrake", "makemkv", "kdenlive", "shotcut", "flowblade", "openshot",
-        "darktable", "rawtherapee", "digikam", "gwenview", "gthumb", "shotwell",
-        "calibre", "foliate", "zathura", "mupdf", "evince", "okular", "atril",
+        "firefox",
+        "chromium",
+        "vlc",
+        "gimp",
+        "libreoffice-fresh",
+        "thunderbird",
+        "inkscape",
+        "blender",
+        "audacity",
+        "obs-studio",
+        "kdenlive",
+        "krita",
+        "telegram-desktop",
+        "discord",
+        "spotify-launcher",
+        "steam",
+        "lutris",
+        "wine",
+        "docker",
+        "virtualbox",
+        "qemu",
+        "libvirt",
+        "ansible",
+        "terraform",
+        "kubectl",
+        "helm",
+        "git",
+        "vim",
+        "neovim",
+        "emacs",
+        "vscode",
+        "code",
+        "nodejs",
+        "npm",
+        "python",
+        "python-pip",
+        "rust",
+        "go",
+        "ruby",
+        "php",
+        "mariadb",
+        "postgresql",
+        "redis",
+        "mongodb",
+        "nginx",
+        "apache",
+        "caddy",
+        "htop",
+        "tmux",
+        "zsh",
+        "fish",
+        "starship",
+        "alacritty",
+        "kitty",
+        "bat",
+        "exa",
+        "fd",
+        "ripgrep",
+        "fzf",
+        "jq",
+        "yq",
+        "wget",
+        "curl",
+        "rsync",
+        "rclone",
+        "syncthing",
+        "nextcloud-client",
+        "keepassxc",
+        "pass",
+        "bitwarden",
+        "veracrypt",
+        "gnupg",
+        "openssh",
+        "wireguard-tools",
+        "openvpn",
+        "nmap",
+        "wireshark-qt",
+        "tcpdump",
+        "netcat",
+        "socat",
+        "ffmpeg",
+        "imagemagick",
+        "graphicsmagick",
+        "pandoc",
+        "hugo",
+        "jekyll",
+        "latex",
+        "texlive-core",
+        "texlive-latexextra",
+        "r",
+        "jupyter-notebook",
+        "octave",
+        "scilab",
+        "maxima",
+        "sagemath",
+        "gcc",
+        "clang",
+        "cmake",
+        "make",
+        "autoconf",
+        "automake",
+        "gdb",
+        "valgrind",
+        "strace",
+        "ltrace",
+        "doxygen",
+        "sphinx",
+        "gtk3",
+        "gtk4",
+        "qt5-base",
+        "qt6-base",
+        "sdl2",
+        "vulkan-tools",
+        "mesa",
+        "lib32-mesa",
+        "nvidia",
+        "nvidia-utils",
+        "xorg-server",
+        "wayland",
+        "sway",
+        "i3-wm",
+        "awesome",
+        "bspwm",
+        "plasma-desktop",
+        "gnome",
+        "xfce4",
+        "mate",
+        "cinnamon",
+        "budgie-desktop",
+        "lightdm",
+        "sddm",
+        "gdm",
+        "greetd",
+        "ly",
+        "cups",
+        "bluez",
+        "bluez-utils",
+        "pulseaudio",
+        "pipewire",
+        "pipewire-pulse",
+        "wireplumber",
+        "alsa-utils",
+        "pavucontrol",
+        "helvum",
+        "gparted",
+        "gnome-disk-utility",
+        "timeshift",
+        "borgbackup",
+        "restic",
+        "duplicati",
+        "baobab",
+        "ncdu",
+        "dust",
+        "neofetch",
+        "screenfetch",
+        "fastfetch",
+        "btop",
+        "bottom",
+        "glances",
+        "nmon",
+        "iotop",
+        "nethogs",
+        "iftop",
+        "bmon",
+        "vnstat",
+        "speedtest-cli",
+        "yt-dlp",
+        "youtube-dl",
+        "mpv",
+        "mplayer",
+        "smplayer",
+        "celluloid",
+        "handbrake",
+        "makemkv",
+        "kdenlive",
+        "shotcut",
+        "flowblade",
+        "openshot",
+        "darktable",
+        "rawtherapee",
+        "digikam",
+        "gwenview",
+        "gthumb",
+        "shotwell",
+        "calibre",
+        "foliate",
+        "zathura",
+        "mupdf",
+        "evince",
+        "okular",
+        "atril",
     ];
 
     let mut rng = thread_rng();
@@ -203,4 +367,3 @@ pub async fn install_polkit_policy() -> Result<CommandResult, String> {
         ))
     }
 }
-

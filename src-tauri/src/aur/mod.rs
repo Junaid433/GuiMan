@@ -1,6 +1,5 @@
-pub mod search;
 pub mod operations;
+pub mod search;
 
-pub use search::*;
 pub use operations::*;
-
+pub use search::*;

@@ -21,7 +21,7 @@ pub fn is_command_available(cmd: &str) -> bool {
 /// Parse package info from pacman output format
 pub fn parse_package_info(stdout: &str) -> serde_json::Map<String, serde_json::Value> {
     let mut info = serde_json::Map::new();
-    
+
     for line in stdout.lines() {
         if let Some(pos) = line.find(':') {
             let key = line[..pos].trim().to_lowercase().replace(' ', "_");
@@ -29,7 +29,6 @@ pub fn parse_package_info(stdout: &str) -> serde_json::Map<String, serde_json::V
             info.insert(key, serde_json::Value::String(value));
         }
     }
-    
+
     info
 }
-

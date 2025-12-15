@@ -74,7 +74,7 @@ pub async fn search_files(pattern: String) -> Result<Vec<FileInfo>, String> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let pattern_lower = pattern.to_lowercase();
-    
+
     let files: Vec<FileInfo> = stdout
         .lines()
         .filter_map(|line| {
@@ -82,7 +82,7 @@ pub async fn search_files(pattern: String) -> Result<Vec<FileInfo>, String> {
             if parts.len() >= 2 {
                 let package = parts[0].to_string();
                 let path = parts[1].to_string();
-                
+
                 if path.to_lowercase().contains(&pattern_lower) {
                     let is_directory = path.ends_with('/');
                     return Some(FileInfo {
@@ -121,7 +121,7 @@ pub async fn list_package_backups(package: String) -> Result<Vec<String>, String
             in_backup_section = true;
             continue;
         }
-        
+
         if in_backup_section {
             if line.starts_with("       ") || line.starts_with("\t") {
                 let backup_file = line.trim().to_string();
@@ -136,5 +136,3 @@ pub async fn list_package_backups(package: String) -> Result<Vec<String>, String
 
     Ok(backups)
 }
-
-

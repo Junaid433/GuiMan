@@ -4,22 +4,23 @@
 )]
 
 // Module declarations
-mod error;
-mod models;
-mod utils;
-mod pacman;
 mod aur;
 mod commands;
+mod error;
+mod models;
+mod pacman;
+mod utils;
 
 use commands::*;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             // Search commands
             search_package,
             get_popular_packages,
-            
             // Package commands
             list_installed,
             check_updates,
@@ -29,14 +30,12 @@ fn main() {
             list_aur_packages,
             install_package,
             remove_package,
-            
             // AUR Advanced Features
             vote_aur_package,
             flag_aur_package,
             adopt_aur_package,
             get_aur_build_info,
             install_aur_with_options,
-            
             // System commands
             update_system,
             clean_cache,
@@ -44,18 +43,15 @@ fn main() {
             get_cache_size,
             check_polkit_policy,
             install_polkit_policy,
-            
             // Groups commands
             list_groups,
             get_group_packages,
             install_group,
-            
             // Files commands
             list_package_files,
             find_file_owner,
             search_files,
             list_package_backups,
-            
             // Repository commands
             list_repositories,
             get_repo_packages,
@@ -63,11 +59,9 @@ fn main() {
             get_mirrorlist_info,
             update_mirrorlist,
             rank_mirrors,
-            
             // Dependency commands
             get_dependency_tree,
             get_reverse_dependency_tree,
-            
             // Backup commands
             create_package_backup,
             list_backups,
@@ -75,7 +69,6 @@ fn main() {
             delete_package_backup,
             list_pacman_hooks,
             export_packages,
-            
             // Updater commands
             check_app_updates,
             install_app_update,

@@ -1,27 +1,35 @@
 use crate::models::CommandResult;
-use tauri::Window;
-use std::process::{Command, Stdio};
-use std::io::{BufRead, BufReader};
-use tokio;
 use serde_json;
+use std::io::{BufRead, BufReader};
+use std::process::{Command, Stdio};
+use tauri::Window;
+use tauri::Emitter;
+use tokio;
 
 /// Install a package
-pub async fn install_package_async(window: Window, package: String) -> Result<CommandResult, String> {
+pub async fn install_package_async(
+    window: Window,
+    package: String,
+) -> Result<CommandResult, String> {
     let pkg_clone = package.clone();
-    
+
     tokio::spawn(async move {
         let mut child = match Command::new("/usr/bin/pkexec")
             .arg("/usr/bin/pacman")
             .args(["-S", "--needed", "--noconfirm", &pkg_clone])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .spawn() {
+            .spawn()
+        {
             Ok(child) => child,
             Err(e) => {
-                let _ = window.emit("install-complete", serde_json::json!({
-                    "success": false,
-                    "message": format!("Failed to start install process: {}", e)
-                }));
+                let _ = window.emit(
+                    "install-complete",
+                    serde_json::json!({
+                        "success": false,
+                        "message": format!("Failed to start install process: {}", e)
+                    }),
+                );
                 return;
             }
         };
@@ -43,10 +51,13 @@ pub async fn install_package_async(window: Window, package: String) -> Result<Co
         let result = match child.wait() {
             Ok(result) => result,
             Err(e) => {
-                let _ = window.emit("install-complete", serde_json::json!({
-                    "success": false,
-                    "message": format!("Failed to wait for install process: {}", e)
-                }));
+                let _ = window.emit(
+                    "install-complete",
+                    serde_json::json!({
+                        "success": false,
+                        "message": format!("Failed to wait for install process: {}", e)
+                    }),
+                );
                 return;
             }
         };
@@ -63,7 +74,7 @@ pub async fn install_package_async(window: Window, package: String) -> Result<Co
             serde_json::json!({
                 "success": success,
                 "message": message
-            })
+            }),
         );
     });
 
@@ -74,22 +85,29 @@ pub async fn install_package_async(window: Window, package: String) -> Result<Co
 }
 
 /// Remove a package
-pub async fn remove_package_async(window: Window, package: String) -> Result<CommandResult, String> {
+pub async fn remove_package_async(
+    window: Window,
+    package: String,
+) -> Result<CommandResult, String> {
     let pkg_clone = package.clone();
-    
+
     tokio::spawn(async move {
         let mut child = match Command::new("/usr/bin/pkexec")
             .arg("/usr/bin/pacman")
             .args(["-Rs", "--noconfirm", &pkg_clone])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .spawn() {
+            .spawn()
+        {
             Ok(child) => child,
             Err(e) => {
-                let _ = window.emit("remove-complete", serde_json::json!({
-                    "success": false,
-                    "message": format!("Failed to start remove process: {}", e)
-                }));
+                let _ = window.emit(
+                    "remove-complete",
+                    serde_json::json!({
+                        "success": false,
+                        "message": format!("Failed to start remove process: {}", e)
+                    }),
+                );
                 return;
             }
         };
@@ -111,10 +129,13 @@ pub async fn remove_package_async(window: Window, package: String) -> Result<Com
         let result = match child.wait() {
             Ok(result) => result,
             Err(e) => {
-                let _ = window.emit("remove-complete", serde_json::json!({
-                    "success": false,
-                    "message": format!("Failed to wait for remove process: {}", e)
-                }));
+                let _ = window.emit(
+                    "remove-complete",
+                    serde_json::json!({
+                        "success": false,
+                        "message": format!("Failed to wait for remove process: {}", e)
+                    }),
+                );
                 return;
             }
         };
@@ -131,11 +152,14 @@ pub async fn remove_package_async(window: Window, package: String) -> Result<Com
             serde_json::json!({
                 "success": success,
                 "message": message
-            })
+            }),
         );
     });
 
-    Ok(CommandResult::success(format!("Removal of {} started", package)))
+    Ok(CommandResult::success(format!(
+        "Removal of {} started",
+        package
+    )))
 }
 
 /// Update the system with proper partial upgrade handling
@@ -182,10 +206,13 @@ pub async fn update_system_async(window: Window) -> Result<CommandResult, String
                 let result = match upgrade_child.wait() {
                     Ok(result) => result,
                     Err(e) => {
-                        let _ = window.emit("update-complete", serde_json::json!({
-                            "success": false,
-                            "message": format!("Failed to wait for update process: {}", e)
-                        }));
+                        let _ = window.emit(
+                            "update-complete",
+                            serde_json::json!({
+                                "success": false,
+                                "message": format!("Failed to wait for update process: {}", e)
+                            }),
+                        );
                         return;
                     }
                 };
@@ -204,14 +231,17 @@ pub async fn update_system_async(window: Window) -> Result<CommandResult, String
                         "success": success,
                         "message": message,
                         "exit_code": exit_code
-                    })
+                    }),
                 );
             }
             Err(e) => {
-                let _ = window.emit("update-complete", serde_json::json!({
-                    "success": false,
-                    "message": format!("✗ Failed to start system upgrade: {}", e)
-                }));
+                let _ = window.emit(
+                    "update-complete",
+                    serde_json::json!({
+                        "success": false,
+                        "message": format!("✗ Failed to start system upgrade: {}", e)
+                    }),
+                );
             }
         }
     });
@@ -220,13 +250,19 @@ pub async fn update_system_async(window: Window) -> Result<CommandResult, String
 }
 
 /// Clean package cache
-pub async fn clean_cache_async(window: Window, aur_helper: Option<String>) -> Result<CommandResult, String> {
+pub async fn clean_cache_async(
+    window: Window,
+    aur_helper: Option<String>,
+) -> Result<CommandResult, String> {
     let helper = aur_helper.unwrap_or_else(|| "yay".to_string());
 
     tokio::spawn(async move {
         // Remove database lock if it exists
         let _ = Command::new("/bin/sh")
-            .args(["-c", "/usr/bin/pkexec rm -f /var/lib/pacman/db.lck 2>/dev/null || true"])
+            .args([
+                "-c",
+                "/usr/bin/pkexec rm -f /var/lib/pacman/db.lck 2>/dev/null || true",
+            ])
             .output();
 
         // Clean pacman cache with real-time output
@@ -296,17 +332,25 @@ pub async fn clean_cache_async(window: Window, aur_helper: Option<String>) -> Re
 
         let (success, final_message) = match (pacman_success, aur_success) {
             (true, true) => (true, "✓ Cache cleaned successfully!".to_string()),
-            (true, false) => (true, "✓ Pacman cache cleaned, but AUR helper cache cleaning failed".to_string()),
-            (false, true) => (false, "⚠ Pacman cache cleaning failed, but AUR cache cleaned".to_string()),
+            (true, false) => (
+                true,
+                "✓ Pacman cache cleaned, but AUR helper cache cleaning failed".to_string(),
+            ),
+            (false, true) => (
+                false,
+                "⚠ Pacman cache cleaning failed, but AUR cache cleaned".to_string(),
+            ),
             (false, false) => (false, "✗ Cache cleaning failed!".to_string()),
         };
 
-        let _ = window.emit("cache-clean-complete", serde_json::json!({
-            "success": success,
-            "message": final_message
-        }));
+        let _ = window.emit(
+            "cache-clean-complete",
+            serde_json::json!({
+                "success": success,
+                "message": final_message
+            }),
+        );
     });
 
     Ok(CommandResult::success("Cache cleaning started".to_string()))
 }
-
