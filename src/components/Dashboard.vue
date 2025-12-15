@@ -1,10 +1,50 @@
 <template>
   <div class="h-full overflow-auto bg-gray-50 dark:bg-gray-900">
-    <!-- Welcome Header -->
+    <!-- Welcome Header with System Health -->
     <div class="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-800 dark:to-purple-800 text-white">
       <div class="max-w-7xl mx-auto px-6 py-8">
-        <h1 class="text-3xl font-bold mb-2">Welcome to GuiMan</h1>
-        <p class="text-blue-100 text-lg">Your Arch Linux package manager</p>
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 class="text-3xl font-bold mb-2">Welcome to GuiMan</h1>
+            <p class="text-blue-100 text-lg">Your Arch Linux package manager</p>
+            <p class="text-blue-200 text-sm mt-2 flex items-center gap-2">
+              <kbd class="px-2 py-0.5 bg-white/20 rounded text-xs">Ctrl+K</kbd>
+              <span>for quick commands</span>
+            </p>
+          </div>
+          
+          <!-- System Health Score -->
+          <div class="flex items-center gap-4 bg-white/10 backdrop-blur-sm rounded-xl p-4">
+            <div class="relative w-20 h-20">
+              <svg class="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                <path
+                  class="text-white/20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  :class="healthScoreColor"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  :stroke-dasharray="`${healthScore}, 100`"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-xl font-bold text-white">{{ healthScore }}</span>
+              </div>
+            </div>
+            <div class="text-left">
+              <p class="text-sm text-blue-200">System Health</p>
+              <p class="text-lg font-semibold text-white">{{ healthLabel }}</p>
+              <p class="text-xs text-blue-200 mt-1">{{ healthTip }}</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -256,10 +296,60 @@ export default {
     const displayedUpdates = computed(() => props.recentUpdates.slice(0, 5))
     const displayedPopular = computed(() => props.popularPackages.slice(0, 6))
     
+    // Calculate system health score (0-100)
+    const healthScore = computed(() => {
+      let score = 100
+      const stats = props.systemStats
+      
+      // Deduct points for updates (max -30)
+      const updatePenalty = Math.min(stats.updatesAvailable * 3, 30)
+      score -= updatePenalty
+      
+      // Deduct points for orphans (max -20)
+      const orphanPenalty = Math.min(stats.orphans * 2, 20)
+      score -= orphanPenalty
+      
+      return Math.max(0, score)
+    })
+    
+    const healthScoreColor = computed(() => {
+      const score = healthScore.value
+      if (score >= 90) return 'text-green-400'
+      if (score >= 70) return 'text-yellow-400'
+      if (score >= 50) return 'text-orange-400'
+      return 'text-red-400'
+    })
+    
+    const healthLabel = computed(() => {
+      const score = healthScore.value
+      if (score >= 90) return 'Excellent'
+      if (score >= 70) return 'Good'
+      if (score >= 50) return 'Fair'
+      return 'Needs Attention'
+    })
+    
+    const healthTip = computed(() => {
+      const stats = props.systemStats
+      if (stats.updatesAvailable > 10) {
+        return `${stats.updatesAvailable} updates pending`
+      }
+      if (stats.orphans > 5) {
+        return `${stats.orphans} orphans to clean`
+      }
+      if (stats.updatesAvailable > 0) {
+        return 'Updates available'
+      }
+      return 'All systems go!'
+    })
+    
     return {
       displayedUpdates,
       displayedPopular,
-      formatDate: formatDateCached
+      formatDate: formatDateCached,
+      healthScore,
+      healthScoreColor,
+      healthLabel,
+      healthTip
     }
   }
 }

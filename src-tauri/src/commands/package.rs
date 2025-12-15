@@ -11,6 +11,122 @@ pub struct PackageCounts {
     pub aur: u32,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct EnhancedPackageInfo {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub url: String,
+    pub licenses: Vec<String>,
+    pub groups: Vec<String>,
+    pub provides: Vec<String>,
+    pub depends_on: Vec<String>,
+    pub optional_deps: Vec<String>,
+    pub required_by: Vec<String>,
+    pub optional_for: Vec<String>,
+    pub conflicts_with: Vec<String>,
+    pub replaces: Vec<String>,
+    pub installed_size: String,
+    pub download_size: String,
+    pub packager: String,
+    pub build_date: String,
+    pub install_date: String,
+    pub install_reason: String,
+    pub install_script: bool,
+    pub validated_by: String,
+}
+
+#[tauri::command]
+pub async fn get_enhanced_package_info(pkg: String) -> Result<EnhancedPackageInfo, String> {
+    // Try installed package first
+    let output = Command::new("/usr/bin/pacman")
+        .args(["-Qi", &pkg])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let stdout = if output.status.success() {
+        String::from_utf8_lossy(&output.stdout).to_string()
+    } else {
+        // Try repo package
+        let repo_output = Command::new("/usr/bin/pacman")
+            .args(["-Si", &pkg])
+            .output()
+            .map_err(|e| e.to_string())?;
+        
+        if repo_output.status.success() {
+            String::from_utf8_lossy(&repo_output.stdout).to_string()
+        } else {
+            return Err(format!("Package {} not found", pkg));
+        }
+    };
+
+    // Parse the output
+    let mut info = EnhancedPackageInfo {
+        name: pkg.clone(),
+        version: String::new(),
+        description: String::new(),
+        url: String::new(),
+        licenses: Vec::new(),
+        groups: Vec::new(),
+        provides: Vec::new(),
+        depends_on: Vec::new(),
+        optional_deps: Vec::new(),
+        required_by: Vec::new(),
+        optional_for: Vec::new(),
+        conflicts_with: Vec::new(),
+        replaces: Vec::new(),
+        installed_size: String::new(),
+        download_size: String::new(),
+        packager: String::new(),
+        build_date: String::new(),
+        install_date: String::new(),
+        install_reason: String::new(),
+        install_script: false,
+        validated_by: String::new(),
+    };
+
+    for line in stdout.lines() {
+        if let Some(pos) = line.find(':') {
+            let key = line[..pos].trim();
+            let value = line[pos + 1..].trim();
+
+            match key {
+                "Name" => info.name = value.to_string(),
+                "Version" => info.version = value.to_string(),
+                "Description" => info.description = value.to_string(),
+                "URL" => info.url = value.to_string(),
+                "Licenses" => info.licenses = parse_list(value),
+                "Groups" => info.groups = parse_list(value),
+                "Provides" => info.provides = parse_list(value),
+                "Depends On" => info.depends_on = parse_list(value),
+                "Optional Deps" => info.optional_deps = parse_list(value),
+                "Required By" => info.required_by = parse_list(value),
+                "Optional For" => info.optional_for = parse_list(value),
+                "Conflicts With" => info.conflicts_with = parse_list(value),
+                "Replaces" => info.replaces = parse_list(value),
+                "Installed Size" => info.installed_size = value.to_string(),
+                "Download Size" => info.download_size = value.to_string(),
+                "Packager" => info.packager = value.to_string(),
+                "Build Date" => info.build_date = value.to_string(),
+                "Install Date" => info.install_date = value.to_string(),
+                "Install Reason" => info.install_reason = value.to_string(),
+                "Install Script" => info.install_script = value == "Yes",
+                "Validated By" => info.validated_by = value.to_string(),
+                _ => {}
+            }
+        }
+    }
+
+    Ok(info)
+}
+
+fn parse_list(value: &str) -> Vec<String> {
+    if value == "None" || value.is_empty() {
+        return Vec::new();
+    }
+    value.split_whitespace().map(|s| s.to_string()).collect()
+}
+
 #[tauri::command]
 pub async fn get_package_counts() -> Result<PackageCounts, String> {
     // Get total package count efficiently using pacman -Q | wc -l

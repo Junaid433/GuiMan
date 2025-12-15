@@ -13,6 +13,12 @@
         <svg class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
         </svg>
+        <!-- Quick command hint -->
+        <div class="absolute right-3 top-1/2 transform -translate-y-1/2 hidden sm:flex items-center gap-1 text-xs text-gray-400">
+          <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-600 rounded">Ctrl</kbd>
+          <span>+</span>
+          <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-600 rounded">K</kbd>
+        </div>
       </div>
       
       <button

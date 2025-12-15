@@ -39,6 +39,16 @@
             style="right: 120px;"
           />
         </div>
+
+        <!-- Filter Bar for package views -->
+        <FilterBar
+          v-if="showFilterBar"
+          :packages="packages"
+          :total-count="packages.length"
+          :filtered-count="displayPackages.length"
+          :active-view="activeView"
+          @filter-change="handleFilterChange"
+        />
         
         <div class="flex-1 overflow-hidden">
           <Dashboard
@@ -154,6 +164,10 @@
           </div>
           <div class="space-y-3">
             <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
+              <span class="text-gray-700 dark:text-gray-300">Command Palette</span>
+              <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-sm">Ctrl+K</kbd>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
               <span class="text-gray-700 dark:text-gray-300">Focus Search</span>
               <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-sm">Ctrl+F</kbd>
             </div>
@@ -185,6 +199,14 @@
         </div>
       </div>
     </div>
+
+    <!-- Command Palette -->
+    <CommandPalette
+      :is-open="showCommandPalette"
+      :system-stats="systemStats"
+      @close="showCommandPalette = false"
+      @command="handlePaletteCommand"
+    />
     </div>
   </div>
 </template>
@@ -208,6 +230,8 @@ import BackupModal from './components/BackupModal.vue'
 import Dashboard from './components/Dashboard.vue'
 import PackageGrid from './components/PackageGrid.vue'
 import NotificationSystem from './components/NotificationSystem.vue'
+import FilterBar from './components/FilterBar.vue'
+import CommandPalette from './components/CommandPalette.vue'
 import configManager from './utils/config.js'
 const appWindow = getCurrentWebviewWindow()
 
@@ -226,7 +250,9 @@ export default {
     DependencyGraph,
     BackupModal,
     Dashboard,
-    NotificationSystem
+    NotificationSystem,
+    FilterBar,
+    CommandPalette
   },
   setup() {
     const activeView = ref('dashboard')
@@ -254,7 +280,9 @@ export default {
     const showBackupModal = ref(false)
     const showKeyboardShortcutsModal = ref(false)
     const showNotificationCenter = ref(false)
+    const showCommandPalette = ref(false)
     const notificationSystem = ref(null)
+    const activeFilters = ref({ quickFilters: [], repo: '', sortBy: 'name', sortDirection: 'asc' })
     const systemStats = ref({
       totalPackages: 0,
       updatesAvailable: 0,
@@ -265,8 +293,58 @@ export default {
     const popularPackages = ref([])
     let refreshInterval = null
 
+    // Computed: whether to show filter bar
+    const showFilterBar = computed(() => {
+      const viewsWithFilters = ['installed', 'updates', 'aur', 'search', 'popular', 'orphans']
+      return viewsWithFilters.includes(activeView.value) && packages.value.length > 0
+    })
+
     const displayPackages = computed(() => {
-      return packages.value
+      let result = [...packages.value]
+      const filters = activeFilters.value
+
+      // Apply quick filters
+      if (filters.quickFilters.includes('installed')) {
+        result = result.filter(p => p.installed)
+      }
+      if (filters.quickFilters.includes('not-installed')) {
+        result = result.filter(p => !p.installed)
+      }
+      if (filters.quickFilters.includes('aur')) {
+        result = result.filter(p => p.repo === 'aur')
+      }
+      if (filters.quickFilters.includes('updates')) {
+        result = result.filter(p => p.description?.includes('→'))
+      }
+
+      // Apply repo filter
+      if (filters.repo) {
+        result = result.filter(p => p.repo === filters.repo)
+      }
+
+      // Apply sorting
+      result.sort((a, b) => {
+        let comparison = 0
+        switch (filters.sortBy) {
+          case 'name':
+          case 'name-desc':
+            comparison = a.name.localeCompare(b.name)
+            if (filters.sortBy === 'name-desc') comparison *= -1
+            break
+          case 'repo':
+            comparison = (a.repo || '').localeCompare(b.repo || '')
+            break
+          case 'date':
+            // Newer first
+            comparison = -1
+            break
+          default:
+            comparison = a.name.localeCompare(b.name)
+        }
+        return filters.sortDirection === 'desc' ? -comparison : comparison
+      })
+
+      return result
     })
 
     const unreadNotificationCount = computed(() => {
@@ -896,8 +974,17 @@ export default {
 
 
     const handleKeydown = (event) => {
-      // Ignore if user is typing in an input
-      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+      // Ignore if user is typing in an input (unless it's command palette shortcut)
+      const isInputFocused = event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA'
+      
+      // Ctrl+K: Open command palette (works even in input)
+      if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+        event.preventDefault()
+        showCommandPalette.value = !showCommandPalette.value
+        return
+      }
+
+      if (isInputFocused) {
         return
       }
 
@@ -926,9 +1013,11 @@ export default {
         return
       }
 
-      // Escape: Clear search
+      // Escape: Clear search or close modals
       if (event.key === 'Escape') {
-        if (searchQuery.value) {
+        if (showCommandPalette.value) {
+          showCommandPalette.value = false
+        } else if (searchQuery.value) {
           searchQuery.value = ''
           handleSearch()
         } else if (showDetailsModal.value) {
@@ -1080,6 +1169,82 @@ export default {
       await saveWindowState()
     })
 
+    // Handle filter changes from FilterBar
+    const handleFilterChange = (filters) => {
+      activeFilters.value = filters
+    }
+
+    // Handle commands from CommandPalette
+    const handlePaletteCommand = (command) => {
+      switch (command.type) {
+        case 'navigate':
+          handleViewChange(command.view)
+          break
+        case 'action':
+          switch (command.action) {
+            case 'update-system':
+              handleUpdateSystem()
+              break
+            case 'sync-databases':
+              invoke('sync_databases').then(() => {
+                sendNotif('success', 'Databases Synced', 'Package databases synchronized successfully')
+              }).catch(err => {
+                sendNotif('error', 'Sync Failed', err.toString())
+              })
+              break
+            case 'clean-cache':
+              handleCleanCache()
+              break
+            case 'remove-orphans':
+              handleViewChange('orphans')
+              break
+            case 'focus-search':
+              const searchInput = document.querySelector('input[type="text"]')
+              if (searchInput) {
+                searchInput.focus()
+                searchInput.select()
+              }
+              break
+            case 'open-settings':
+              showSettingsModal.value = true
+              break
+            case 'toggle-theme':
+              toggleTheme()
+              break
+            case 'toggle-view':
+              toggleViewMode()
+              break
+            case 'refresh':
+              handleViewChange(activeView.value)
+              break
+            case 'install-package':
+              handleViewChange('search')
+              setTimeout(() => {
+                const searchInput = document.querySelector('input[type="text"]')
+                if (searchInput) {
+                  searchInput.focus()
+                }
+              }, 100)
+              break
+            case 'export-packages':
+              invoke('export_package_list').then(list => {
+                const blob = new Blob([list.join('\n')], { type: 'text/plain' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = 'packages.txt'
+                a.click()
+                URL.revokeObjectURL(url)
+                sendNotif('success', 'Export Complete', `Exported ${list.length} packages`)
+              }).catch(err => {
+                sendNotif('error', 'Export Failed', err.toString())
+              })
+              break
+          }
+          break
+      }
+    }
+
     return {
       activeView,
       searchQuery,
@@ -1105,10 +1270,13 @@ export default {
       showBackupModal,
       showKeyboardShortcutsModal,
       showNotificationCenter,
+      showCommandPalette,
       notificationSystem,
       systemStats,
       recentUpdates,
       popularPackages,
+      packages,
+      showFilterBar,
       toggleTheme,
       toggleViewMode,
       toggleSidebar,
@@ -1131,9 +1299,10 @@ export default {
       handleClearSelection,
       handleShowDependencies,
       handleNotificationAction,
+      handleFilterChange,
+      handlePaletteCommand,
       closeLogModal
     }
   }
 }
 </script>
-

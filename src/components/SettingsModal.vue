@@ -396,7 +396,7 @@
               <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">GuiMan</h3>
               <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">Arch Linux Package Manager</p>
               <div class="inline-block px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm font-mono text-gray-900 dark:text-white">
-                v1.5.0
+                v1.6.0
               </div>
               <p class="text-gray-500 dark:text-gray-400 text-xs mt-2">
                 <a href="https://github.com/Junaid433" target="_blank" class="text-blue-600 hover:text-blue-700">By Junaid Rahman</a>

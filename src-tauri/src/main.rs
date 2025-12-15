@@ -24,6 +24,7 @@ fn main() {
             // Package commands
             list_installed,
             get_package_counts,
+            get_enhanced_package_info,
             check_updates,
             list_orphans,
             get_package_history,
