@@ -39,13 +39,7 @@
         <div class="flex items-center gap-3">
           <div class="flex items-center gap-2">
             <label class="text-sm text-gray-600 dark:text-gray-400">Depth:</label>
-            <select v-model="maxDepth" @change="loadGraph" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
+            <CustomSelect v-model="maxDepth" :options="depthOptions" @change="loadGraph" class="w-24" />
           </div>
           
           <button @click="$emit('close')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
@@ -139,11 +133,13 @@
 <script>
 import { invoke } from '@tauri-apps/api/core'
 import DependencyTreeNode from './DependencyTreeNode.vue'
+import CustomSelect from './CustomSelect.vue'
 
 export default {
   name: 'DependencyGraph',
   components: {
-    DependencyTreeNode
+    DependencyTreeNode,
+    CustomSelect
   },
   props: {
     packageName: {
@@ -169,6 +165,9 @@ export default {
     notInstalledCount() {
       if (!this.graph) return 0
       return Object.values(this.graph.nodes).filter(node => !node.installed).length
+    },
+    depthOptions() {
+      return [1,2,3,4,5].map(n => ({ value: String(n), label: String(n) }))
     }
   },
   mounted() {

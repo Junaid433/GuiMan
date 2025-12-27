@@ -23,31 +23,23 @@
       <!-- Repository Filter -->
       <div class="flex items-center gap-2">
         <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Repo:</span>
-        <select
+        <CustomSelect
           v-model="selectedRepo"
+          :options="repoOptions"
           @change="emitFilters"
-          class="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border-0 rounded-lg text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">All Repositories</option>
-          <option v-for="repo in repositories" :key="repo" :value="repo">{{ repo }}</option>
-        </select>
+          class="w-48"
+        />
       </div>
 
       <!-- Sort Options -->
       <div class="flex items-center gap-2 ml-auto">
         <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sort:</span>
-        <select
+        <CustomSelect
           v-model="sortBy"
+          :options="sortOptions"
           @change="emitFilters"
-          class="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border-0 rounded-lg text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="name">Name (A-Z)</option>
-          <option value="name-desc">Name (Z-A)</option>
-          <option value="size">Size (Largest)</option>
-          <option value="size-asc">Size (Smallest)</option>
-          <option value="date">Recently Updated</option>
-          <option value="repo">Repository</option>
-        </select>
+          class="w-48"
+        />
 
         <!-- Sort Direction Toggle -->
         <button
@@ -99,8 +91,11 @@
 </template>
 
 <script>
+import CustomSelect from './CustomSelect.vue'
+
 export default {
   name: 'FilterBar',
+  components: { CustomSelect },
   props: {
     totalCount: {
       type: Number,
@@ -165,6 +160,21 @@ export default {
     repositories() {
       const repos = new Set(this.packages.map(p => p.repo).filter(r => r && r !== 'aur'))
       return Array.from(repos).sort()
+    },
+    repoOptions() {
+      const opts = [{ value: '', label: 'All Repositories' }]
+      this.repositories.forEach(r => opts.push({ value: r, label: r }))
+      return opts
+    },
+    sortOptions() {
+      return [
+        { value: 'name', label: 'Name (A-Z)' },
+        { value: 'name-desc', label: 'Name (Z-A)' },
+        { value: 'size', label: 'Size (Largest)' },
+        { value: 'size-asc', label: 'Size (Smallest)' },
+        { value: 'date', label: 'Recently Updated' },
+        { value: 'repo', label: 'Repository' }
+      ]
     },
     hasActiveFilters() {
       return this.activeFilters.length > 0 || this.selectedRepo !== ''

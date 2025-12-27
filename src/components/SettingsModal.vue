@@ -152,10 +152,7 @@
 
             <div v-if="localConfig.aurSupport">
               <label class="text-sm font-medium text-gray-900 dark:text-white">AUR Helper</label>
-              <select v-model="localConfig.aurHelper" class="mt-2 w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white">
-                <option value="yay">yay</option>
-                <option value="paru">paru</option>
-              </select>
+              <CustomSelect v-model="localConfig.aurHelper" class="mt-2" :options="aurHelperOptions" />
             </div>
           </div>
 
@@ -396,7 +393,7 @@
               <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">GuiMan</h3>
               <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">Arch Linux Package Manager</p>
               <div class="inline-block px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm font-mono text-gray-900 dark:text-white">
-                v1.6.0
+                v1.6.1
               </div>
               <p class="text-gray-500 dark:text-gray-400 text-xs mt-2">
                 <a href="https://github.com/Junaid433" target="_blank" class="text-blue-600 hover:text-blue-700">By Junaid Rahman</a>
@@ -494,9 +491,11 @@
 <script>
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import CustomSelect from './CustomSelect.vue'
 
 export default {
   name: 'SettingsModal',
+  components: { CustomSelect },
   props: {
     config: Object
   },
@@ -532,7 +531,11 @@ export default {
         yay_path: '~/.cache/yay',
         paru: '0',
         paru_path: '~/.cache/paru/clone'
-      }
+      },
+      aurHelperOptions: [
+        { value: 'yay', label: 'yay' },
+        { value: 'paru', label: 'paru' }
+      ]
     }
   },
   async mounted() {

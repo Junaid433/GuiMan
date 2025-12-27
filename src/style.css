@@ -45,3 +45,44 @@ body {
   background: rgba(75, 85, 99, 0.7);
 }
 
+/* Fix: dark-mode native selects and dropdown options */
+/* Keep selects visually identical to the other form inputs (dark:bg-gray-700/dark:border-gray-600) */
+.dark select {
+  color-scheme: dark;
+  color: #fff; /* text */
+  -webkit-text-fill-color: #fff; /* WebKit-specific */
+  background-color: #374151; /* Tailwind gray-700 to match inputs like Max concurrent downloads */
+  border-color: #4b5563; /* Tailwind gray-600 */
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font: inherit;
+}
+
+/* Ensure dropdown options match the same background where engines honor it */
+.dark select option {
+  color: #fff;
+  background-color: #374151;
+}
+
+/* Subtle, consistent focus ring in dark mode */
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.12); /* soft indigo ring */
+}
+
+/* Consistent appearance across platforms and keep spacing consistent with other inputs */
+select {
+  -webkit-appearance: menulist-button;
+  appearance: menulist-button;
+  color: inherit;
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+  border-width: 1px;
+  border-radius: 0.5rem;
+}
+
+/* Try to make the native arrow visible on some platforms by inverting where supported */
+select::-ms-expand {
+  filter: invert(1);
+}
+
