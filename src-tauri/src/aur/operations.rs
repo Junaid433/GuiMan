@@ -1,5 +1,5 @@
 use crate::models::{CommandResult, PackageInfo};
-use crate::utils::is_command_available;
+use crate::utils::{is_command_available, strip_ansi_codes};
 use serde_json;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
@@ -47,20 +47,25 @@ pub fn list_aur_packages(helper: &str) -> Result<Vec<PackageInfo>, String> {
     }
 
     let output = Command::new(format!("/usr/bin/{}", helper_cmd))
-        .args(["-Sl", "aur"])
+        .args(["-Sl", "--aur", "--color=never"])
         .output()
         .map_err(|e| format!("Failed to list AUR packages: {}", e))?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut packages = Vec::new();
 
     for line in stdout.lines().take(50) {
-        let parts: Vec<&str> = line.split_whitespace().collect();
+        let clean_line = strip_ansi_codes(line);
+        let parts: Vec<&str> = clean_line.split_whitespace().collect();
         if parts.len() >= 3 {
             let name = parts[1];
             let version = parts[2];
             let installed =
-                line.to_lowercase().contains("[installed]") || line.contains("(Installed)");
+                clean_line.to_lowercase().contains("[installed]") || clean_line.contains("(Installed)");
 
             packages.push(PackageInfo {
                 name: name.to_string(),
@@ -239,9 +244,9 @@ pub fn install_aur_with_options(
 pub async fn install_aur_package_async(
     window: Window,
     package: String,
+    helper: String,
 ) -> Result<CommandResult, String> {
     let pkg_clone = package.clone();
-    let helper = "yay".to_string();
 
     tokio::spawn(async move {
         let helper_cmd = match helper.as_str() {
@@ -343,9 +348,9 @@ pub async fn install_aur_package_async(
 pub async fn remove_aur_package_async(
     window: Window,
     package: String,
+    helper: String,
 ) -> Result<CommandResult, String> {
     let pkg_clone = package.clone();
-    let helper = "yay".to_string();
 
     tokio::spawn(async move {
         let helper_cmd = match helper.as_str() {

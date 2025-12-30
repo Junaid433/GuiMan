@@ -1,12 +1,13 @@
+use regex::Regex;
 use std::process::Command;
 
 /// Strip ANSI escape sequences from a string
 pub fn strip_ansi_codes(input: &str) -> String {
-    input
-        .replace("\x1b[1m", "")
-        .replace("\x1b[0m", "")
-        .replace("\x1b]8;;", "")
-        .replace("\x1b\\", "")
+    let pattern = Regex::new(r"\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07]*(\x07|\x1b\\)").ok();
+    match pattern {
+        Some(pattern) => pattern.replace_all(input, "").to_string(),
+        None => input.to_string(),
+    }
 }
 
 /// Check if a command is available in PATH
