@@ -463,7 +463,8 @@ export default {
         const info = await invoke('get_package_info', { 
           pkg: pkg.name,
           repo: pkg.repo || 'unknown',
-          is_installed: pkg.installed || false
+          is_installed: pkg.installed || false,
+          helper: config.value.aurHelper || 'yay'
         })
         let size = info.installed_size || info.download_size || 'Unknown'
         
@@ -728,7 +729,10 @@ export default {
           showLogModal.value = true
 
           try {
-            await invoke('install_package', { pkg: pkg.name })
+            await invoke('install_package', { 
+              pkg: pkg.name,
+              helper: config.value.aurHelper || 'yay'
+            })
           } catch (error) {
             logs.value.push(`Error: ${error}`)
             operationCompleted.value = true
@@ -756,7 +760,10 @@ export default {
           showLogModal.value = true
 
           try {
-            await invoke('remove_package', { pkg: pkg.name })
+            await invoke('remove_package', { 
+              pkg: pkg.name,
+              helper: config.value.aurHelper || 'yay'
+            })
           } catch (error) {
             logs.value.push(`Error: ${error}`)
             operationCompleted.value = true
@@ -783,7 +790,10 @@ export default {
         showLogModal.value = true
 
         try {
-          await invoke('install_package', { pkg: packageNames })
+          await invoke('install_package', { 
+            pkg: packageNames,
+            helper: config.value.aurHelper || 'yay'
+          })
         } catch (error) {
           logs.value.push(`Error: ${error}`)
           operationCompleted.value = true
@@ -822,7 +832,10 @@ export default {
         showLogModal.value = true
 
         try {
-          await invoke('remove_package', { pkg: packageNames })
+          await invoke('remove_package', { 
+            pkg: packageNames,
+            helper: config.value.aurHelper || 'yay'
+          })
         } catch (error) {
           logs.value.push(`Error: ${error}`)
           operationCompleted.value = true

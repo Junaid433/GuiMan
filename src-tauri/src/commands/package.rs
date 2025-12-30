@@ -179,12 +179,14 @@ pub async fn get_package_info(
     pkg: String,
     repo: Option<String>,
     is_installed: Option<bool>,
+    helper: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let repo = repo.unwrap_or_else(|| "unknown".to_string());
     let is_installed = is_installed.unwrap_or(false);
+    let helper = helper.unwrap_or_else(|| "yay".to_string());
 
     let stdout = if repo == "aur" && !is_installed {
-        aur::get_aur_package_info(&pkg, "yay")?
+        aur::get_aur_package_info(&pkg, &helper)?
     } else {
         pacman::get_package_info(&pkg, &repo, is_installed)?
     };
@@ -199,7 +201,11 @@ pub async fn list_aur_packages(helper: String) -> Result<Vec<PackageInfo>, Strin
 }
 
 #[tauri::command]
-pub async fn install_package(window: Window, pkg: String) -> Result<CommandResult, String> {
+pub async fn install_package(
+    window: Window,
+    pkg: String,
+    helper: Option<String>,
+) -> Result<CommandResult, String> {
     // Check if package exists in official repositories
     let is_official = Command::new("/usr/bin/pacman")
         .args(["-Si", &pkg])
@@ -212,12 +218,17 @@ pub async fn install_package(window: Window, pkg: String) -> Result<CommandResul
         pacman::install_package_async(window, pkg).await
     } else {
         // Use AUR helper for AUR packages (async with real-time output)
-        aur::install_aur_package_async(window, pkg).await
+        let helper = helper.unwrap_or_else(|| "yay".to_string());
+        aur::install_aur_package_async(window, pkg, helper).await
     }
 }
 
 #[tauri::command]
-pub async fn remove_package(window: Window, pkg: String) -> Result<CommandResult, String> {
+pub async fn remove_package(
+    window: Window,
+    pkg: String,
+    helper: Option<String>,
+) -> Result<CommandResult, String> {
     // Check if package exists in official repositories
     let is_official = Command::new("/usr/bin/pacman")
         .args(["-Si", &pkg])
@@ -230,7 +241,8 @@ pub async fn remove_package(window: Window, pkg: String) -> Result<CommandResult
         pacman::remove_package_async(window, pkg).await
     } else {
         // Use AUR helper for AUR packages - we need to create this function
-        aur::remove_aur_package_async(window, pkg).await
+        let helper = helper.unwrap_or_else(|| "yay".to_string());
+        aur::remove_aur_package_async(window, pkg, helper).await
     }
 }
 
