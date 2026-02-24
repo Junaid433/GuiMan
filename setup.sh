@@ -22,7 +22,7 @@ echo "✅ Rust version: $(rustc --version)"
 echo ""
 
 echo "📦 Installing system dependencies..."
-sudo pacman -S --needed webkit2gtk base-devel curl wget openssl appmenu-gtk-module gtk3 libappindicator-gtk3 librsvg libvips
+sudo pacman -S --needed webkit2gtk-4.1 base-devel curl wget openssl appmenu-gtk-module gtk3 libappindicator-gtk3 librsvg libvips
 
 echo ""
 echo "📦 Installing npm dependencies..."
@@ -40,4 +40,3 @@ echo "⚠️  Important: Install the polkit policy from Settings to avoid"
 echo "   entering your password on every package operation!"
 echo ""
 echo "Happy package managing! 🎉"
-

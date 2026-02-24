@@ -21,7 +21,7 @@ echo "==> Installing ${PKGNAME} v${PKGVER}"
 # ------------------------------------------------------------------------------
 echo "==> Checking dependencies..."
 
-DEPS=(webkit2gtk gtk3 libayatana-appindicator pacman sudo)
+DEPS=(webkit2gtk-4.1 gtk3 libayatana-appindicator pacman sudo)
 MAKEDEPS=(nodejs npm git ffmpeg pkgconf openssl base-devel)
 
 for dep in "${DEPS[@]}" "${MAKEDEPS[@]}"; do

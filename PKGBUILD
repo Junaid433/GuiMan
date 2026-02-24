@@ -7,7 +7,7 @@ arch=('x86_64')
 url="https://github.com/Junaid433/guiman"
 license=('MIT')
 depends=(
-    'webkit2gtk'
+    'webkit2gtk-4.1'
     'gtk3'
     'libayatana-appindicator'
     'pacman'

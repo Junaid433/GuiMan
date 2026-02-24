@@ -122,7 +122,7 @@ The interface is tabbed, here's what's in each tab:
 
 Need these first:
 ```bash
-sudo pacman -S rust nodejs npm webkit2gtk gtk3 libayatana-appindicator
+sudo pacman -S rust nodejs npm webkit2gtk-4.1 gtk3 libayatana-appindicator
 ```
 
 Then:
